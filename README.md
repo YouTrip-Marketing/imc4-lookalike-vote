@@ -142,9 +142,9 @@ upload feature**: drop the files in `public/key-visual/` and set `keyVisual` in
 ### The real key visual and its colour band (Revision 8, 2026-10-05)
 
 Kelicia's "Top 20" key visual, used exactly as supplied (PNG, not re-encoded):
-`public/key-visual/imc4-lookalike-kv-1080x608.png` (16:9, below 900px, 699 KB)
-and `imc4-lookalike-kv-1920x640.png` (3:1, from 900px, 1203 KB). Alt text:
-"Top 20 K-pop idol lookalikes. YouTrip, 28 Oct to 31 Dec. T&Cs apply." It must
+`public/key-visual/imc4-lookalike-kv-1080x608.png` (16:9, below 900px, 700 KB)
+and `imc4-lookalike-kv-1920x640.png` (3:1, from 900px, 1204 KB). Alt text:
+"Top 20 K-pop idol lookalikes. YouTrip. Voting closes 5 Nov. T&Cs apply." It must
 never name the artist (unit-tested).
 
 The creative's background is a left-to-right gradient, dark indigo to violet,

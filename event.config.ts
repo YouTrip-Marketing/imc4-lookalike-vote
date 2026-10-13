@@ -66,7 +66,8 @@ export const event: EventInfo = {
 /**
  * KEY VISUAL: the banner at the very top of the voting page.
  *
- * Kelicia's "Top 20" key visual, supplied 2026-10-05, in public/key-visual/,
+ * Kelicia's "Top 20" key visual, supplied 2026-10-05, pill updated 2026-10-13
+ * ("voting closes on 5 Nov"; background unchanged), in public/key-visual/,
  * used exactly as supplied (PNG, not re-encoded):
  *   mobile:  16:9 (1080 x 608), used below 900px wide
  *   desktop: 3:1 (1920 x 640), used from 900px wide
@@ -83,7 +84,7 @@ export const event: EventInfo = {
 export const keyVisual: KeyVisual = {
   mobile: 'key-visual/imc4-lookalike-kv-1080x608.png',
   desktop: 'key-visual/imc4-lookalike-kv-1920x640.png',
-  alt: 'Top 20 K-pop idol lookalikes. YouTrip, 28 Oct to 31 Dec. T&Cs apply.',
+  alt: 'Top 20 K-pop idol lookalikes. YouTrip. Voting closes 5 Nov. T&Cs apply.',
 };
 
 /**

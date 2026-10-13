@@ -75,7 +75,7 @@ describe('event.config.ts', () => {
     });
 
     it('has the agreed alt text', () => {
-      expect(keyVisual.alt).toBe('Top 20 K-pop idol lookalikes. YouTrip, 28 Oct to 31 Dec. T&Cs apply.');
+      expect(keyVisual.alt).toBe('Top 20 K-pop idol lookalikes. YouTrip. Voting closes 5 Nov. T&Cs apply.');
     });
 
     it('never names the artist in the alt text (naming rule, until legal clears)', () => {
