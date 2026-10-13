@@ -77,15 +77,11 @@ Everything is in **`event.config.ts`**. Nothing about the event is hardcoded els
 | "Many votes from one network" flag threshold | `sharedAddressRule` (default 10 votes from one IP address). Flag only |
 | Legal-review switch | `event.legalReviewPending` (blocks `npm run deploy` while `true`; not shown on the page) |
 
-**The dates in the file are placeholders.** The campaign documents disagree:
-
-| Source | Voting opens | Voting closes | Top 10 announced |
-|---|---|---|---|
-| PR brief FINAL | 3 Nov | not stated | 5 Nov |
-| Execution plan | Thu 5 Nov 12:00 | Sun 8 Nov 23:59 | Tue 10 Nov |
-
-The config currently holds the PR brief's dates, with a 12:00 open and a 4 Nov
-23:59 close that are **assumptions**, not taken from either document.
+**Voting window confirmed by Kelicia (2026-10-13):** opens Mon 2 Nov 2026 12:00
+SGT (Top 20 reveal), closes Thu 5 Nov 2026 23:59 SGT (matches the key visual's
+"voting closes on 5 Nov" pill). The 12:00 open and 23:59 close follow the
+file's earlier time convention. The earlier placeholders (3 Nov 12:00 to 4 Nov
+23:59) matched neither the PR brief nor the execution plan.
 
 **Contestant photos.** Put consented photos in `public/contestants/` and set
 `photo: 'contestants/01.jpg'`. Portrait **4:5**, 480 x 600 px (face roughly

@@ -128,20 +128,19 @@ export const contestants: readonly Contestant[] = Array.from({ length: 20 }, (_,
 });
 
 /**
- * UNCONFIRMED. The campaign documents disagree, so treat these as placeholders:
- *
- *   PR brief FINAL    voting opens 3 Nov, Top 10 on 5 Nov (no times given; the
- *                     12:00 open and 4 Nov 23:59 close below are assumptions)
- *   Execution plan    opensAt  '2026-11-05T12:00:00+08:00'
- *                     closesAt '2026-11-08T23:59:00+08:00', Top 10 on 10 Nov
+ * CONFIRMED by Kelicia 2026-10-13: voting closes Thu 5 Nov 2026 (matches the
+ * "Top 20" key visual pill). Opens Mon 2 Nov 2026, the Top 20 reveal date.
+ * Times keep this file's earlier convention: open 12:00, close 23:59 SGT.
+ * (Replaced placeholders 3 Nov 12:00 to 4 Nov 23:59, which matched neither the
+ * PR brief nor the execution plan.)
  *
  * Always write the +08:00 offset. autoOpen: true means voting opens by itself at
  * opensAt and closes by itself at closesAt; an admin can pause and resume inside
  * the window but cannot move its edges.
  */
 export const votingWindow: VotingWindow = {
-  opensAt: '2026-11-03T12:00:00+08:00',
-  closesAt: '2026-11-04T23:59:00+08:00',
+  opensAt: '2026-11-02T12:00:00+08:00',
+  closesAt: '2026-11-05T23:59:00+08:00',
   autoOpen: true,
 };
 
