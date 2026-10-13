@@ -101,7 +101,8 @@ const CHROME_CANDIDATES = [
 
 const DUPLICATE = 'A vote has already been counted for this email.';
 // Revision 10: Kelicia's wording, verbatim.
-const OPEN_H1 = 'Vote your favourite lookalike now!';
+const OPEN_H1 = `Who makes the Top ${event.advancing}?`;
+const OPEN_LEDE = 'Vote your favourite lookalike now! Voting closes Thu 5 Nov, 11:59pm SGT.';
 const RULE_LINE = 'One vote per person. It cannot be changed once you confirm.';
 const TOP10_LINE = `Top ${event.advancing} will be announced ${formatLongCalendarDate(event.top10AnnouncedOn)}.`;
 const ANOTHER_PERSON = 'Someone else voting on this phone? Vote with their email';
@@ -727,13 +728,10 @@ async function partA(browser: Browser, site: string): Promise<void> {
     const dot = await voter.$eval('.pill--open .pill__dot', (node) => getComputedStyle(node).backgroundColor);
     assert.equal(dot, 'rgb(61, 220, 132)', 'the open dot is not green');
     assert.equal(await voter.$eval('.voter__intro h1', (node) => node.textContent), OPEN_H1);
-    assert.equal(
-      await voter.$eval('.voter__lede', (node) => node.textContent),
-      `Voting closes ${formatSgtDateTime(votingWindow.closesAt)}.`,
-    );
+    assert.equal(OPEN_H1, 'Who makes the Top 10?');
+    assert.equal(await voter.$eval('.voter__lede', (node) => node.textContent), OPEN_LEDE);
+    assert.equal(OPEN_LEDE, `Vote your favourite lookalike now! Voting closes ${formatSgtDateTime(votingWindow.closesAt)}.`);
     assert.equal(await voter.$eval('.voter__rule', (node) => node.textContent), RULE_LINE);
-    assert.equal(`${OPEN_H1} Voting closes ${formatSgtDateTime(votingWindow.closesAt)}.`,
-      'Vote your favourite lookalike now! Voting closes Thu 5 Nov, 11:59pm SGT.');
   });
 
   await step('all 20 contestants are numbered 1 to 20 and use generated placeholders, not photos', async () => {

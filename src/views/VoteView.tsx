@@ -283,7 +283,7 @@ export function VoteView({ store }: { store: VoteStore }): JSX.Element {
                 ? 'Voting opens soon'
                 : voted
                   ? 'Vote in!'
-                  : 'Vote your favourite lookalike now!'}
+                  : `Who makes the Top ${event.advancing}?`}
         </h1>
         <p className="voter__lede">
           {sending && (
@@ -311,7 +311,12 @@ export function VoteView({ store }: { store: VoteStore }): JSX.Element {
               {canChange ? 'Changed your mind? You can switch until voting closes.' : top10Line}
             </>
           )}
-          {!sending && status === 'open' && !voted && closes !== '' && <>Voting closes {closes}.</>}
+          {!sending && status === 'open' && !voted && (
+            <>
+              Vote your favourite lookalike now!
+              {closes !== '' && <> Voting closes {closes}.</>}
+            </>
+          )}
         </p>
         {!sending && status === 'open' && !voted && <p className="voter__rule">{ruleLine}</p>}
         {!sending && status === 'open' && voted && (

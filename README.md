@@ -739,7 +739,7 @@ either removed paragraph comes back.
 2. **Key visual edge to edge.** It sits outside the padded column, with no side or top gap and no rounded corners, up to 1920px wide. On desktop this makes it much taller than before (427px at 1280). Option B, a re-cut with a bigger title lockup, needs design.
 3. **Brand line removed** from the voting page. The key visual carries the title. The admin view keeps it.
 4. **Green dot** on "Voting open". Grey before voting opens, red once closed.
-5. **Headline and close line:** "Vote your favourite lookalike now!", then "Voting closes Thu 5 Nov, 11:59pm SGT." (from `votingWindow`).
+5. **Headline kept, her line under it:** the H1 stays "Who makes the Top 10?" (Kelicia, 13 Oct: keep it). Under it: "Vote your favourite lookalike now! Voting closes Thu 5 Nov, 11:59pm SGT." (date from `votingWindow`).
 6. **Rule line:** "One vote per person. It cannot be changed once you confirm." It also appears in the confirm sheet.
 7. **Promo pop-up after a vote** (`PromoPopup` in `src/ui/PromoBanner.tsx`). It holds the creative and a Close button, and links to `promoBanner.href` once that is set. Before a vote the promo is not on the page. Once voted, or when voting is not open, it also sits at the bottom.
 8. **Top 10 line:** "Top 10 will be announced Saturday, 7 Nov." (from `event.top10AnnouncedOn`).
