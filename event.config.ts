@@ -44,8 +44,9 @@ export const event: EventInfo = {
   organiser: 'YouTrip',
   advancing: 10,
 
-  // UNCONFIRMED. PR brief FINAL says 5 Nov; the execution plan says 10 Nov.
-  top10AnnouncedOn: '2026-11-05',
+  // Sat 7 Nov 2026: Top 10 reveal, set 2026-10-13 with the confirmed 2 to 5 Nov
+  // voting window (was 5 Nov, the PR brief's date, which is now close day).
+  top10AnnouncedOn: '2026-11-07',
 
   // PAGE COPY RULE (Kelicia, 2026-09-29): the page does not explain or justify
   // why it asks for things. No purpose lines, privacy explanations or

@@ -79,7 +79,8 @@ Everything is in **`event.config.ts`**. Nothing about the event is hardcoded els
 
 **Voting window confirmed by Kelicia (2026-10-13):** opens Mon 2 Nov 2026 12:00
 SGT (Top 20 reveal), closes Thu 5 Nov 2026 23:59 SGT (matches the key visual's
-"voting closes on 5 Nov" pill). The 12:00 open and 23:59 close follow the
+"voting closes on 5 Nov" pill). Top 10 announced Sat 7 Nov 2026
+(`top10AnnouncedOn`). The 12:00 open and 23:59 close follow the
 file's earlier time convention. The earlier placeholders (3 Nov 12:00 to 4 Nov
 23:59) matched neither the PR brief nor the execution plan.
 
