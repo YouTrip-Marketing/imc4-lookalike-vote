@@ -25,7 +25,7 @@ import { basename, dirname, join, resolve } from 'node:path';
 import puppeteer, { type Browser, type BrowserContext, type Page } from 'puppeteer-core';
 import { build, preview, type Plugin, type PreviewServer } from 'vite';
 import { burstRule, contestants, demo, event, keyVisual, promoBanner, votingWindow } from '../event.config';
-import { formatCalendarDate, formatSgtDateTime } from '../src/domain/time';
+import { formatLongCalendarDate, formatSgtDateTime } from '../src/domain/time';
 import { startLocalApiServer, type LocalApiServer } from './local-api-server';
 import { STUB_IP, startSheetStubServer, type SheetStubServer } from './sheet-stub-server';
 
@@ -100,6 +100,10 @@ const CHROME_CANDIDATES = [
 ];
 
 const DUPLICATE = 'A vote has already been counted for this email.';
+// Revision 10: Kelicia's wording, verbatim.
+const OPEN_H1 = 'Vote your favourite lookalike now!';
+const RULE_LINE = 'One vote per person. It cannot be changed once you confirm.';
+const TOP10_LINE = `Top ${event.advancing} will be announced ${formatLongCalendarDate(event.top10AnnouncedOn)}.`;
 const ANOTHER_PERSON = 'Someone else voting on this phone? Vote with their email';
 
 let passed = 0;
@@ -185,6 +189,7 @@ const text = (page: Page): Promise<string> => page.evaluate(READ_TEXT) as Promis
  */
 async function press(page: Page, label: string, within = 'body'): Promise<void> {
   await page.bringToFront();
+  if (!(label === 'Close' && within.includes('sheet--promo'))) await closePromoPopup(page);
   const find = (wanted: string, scope: string): HTMLButtonElement | null => {
     const root = document.querySelector(scope);
     if (root === null) return null;
@@ -223,7 +228,28 @@ async function press(page: Page, label: string, within = 'body'): Promise<void> 
   );
 }
 
+/**
+ * Revision 10: a counted vote opens the promo pop-up, which is modal. A person
+ * closes it before tapping anything else on the page, so the helpers do too.
+ */
+async function closePromoPopup(page: Page): Promise<void> {
+  if ((await page.$('dialog.sheet--promo[open]')) === null) return;
+  await page.evaluate(() => {
+    const close = [...document.querySelectorAll<HTMLButtonElement>('dialog.sheet--promo[open] button')].find(
+      (button) => (button.textContent ?? '').trim() === 'Close',
+    );
+    close?.click();
+  });
+  await page.waitForFunction(() => document.querySelector('dialog.sheet--promo[open]') === null, { timeout: 5_000 });
+}
+
+/** Before a vote, the promo is nowhere on the page (Revision 10). */
+async function noPromoYet(page: Page): Promise<void> {
+  assert.equal(await page.$('.promo-banner'), null, 'the promo banner shows before a vote');
+}
+
 async function pickCard(page: Page, contestantNumber: number): Promise<void> {
+  await closePromoPopup(page);
   await page.bringToFront();
   await page.waitForSelector(`.grid > li:nth-child(${contestantNumber}) .card__face:not(:disabled)`);
   await page.click(`.grid > li:nth-child(${contestantNumber}) .card__face`);
@@ -686,7 +712,7 @@ async function partA(browser: Browser, site: string): Promise<void> {
   const voter = await open(context, `${site}/`);
 
   await step('the link from Instagram lands straight on the voting page, inside the window', async () => {
-    await see(voter, `Who makes the Top ${event.advancing}?`);
+    await see(voter, OPEN_H1);
     await see(voter, 'DEMO DATA');
     assert.equal((await voter.$$('.grid > li')).length, 20);
     assert.equal(await cardsDisabled(voter), false);
@@ -694,8 +720,20 @@ async function partA(browser: Browser, site: string): Promise<void> {
     await shot(voter, 'demo-01-vote-open');
   });
 
-  await step('promo banner: at the bottom, after the contestants, as a plain image (no link set yet)', async () => {
-    await checkPromo(voter, 'bottom');
+  await step('Rev 10: no promo before a vote; no brand line; green dot; her two lines, verbatim', async () => {
+    await noPromoYet(voter);
+    assert.equal(await voter.$('main .brand'), null, 'the brand line under the banner is back');
+    assert.equal(/jung\s*kook|lookalike contest/i.test(await text(voter)), false, 'the page text names the contest/artist');
+    const dot = await voter.$eval('.pill--open .pill__dot', (node) => getComputedStyle(node).backgroundColor);
+    assert.equal(dot, 'rgb(61, 220, 132)', 'the open dot is not green');
+    assert.equal(await voter.$eval('.voter__intro h1', (node) => node.textContent), OPEN_H1);
+    assert.equal(
+      await voter.$eval('.voter__lede', (node) => node.textContent),
+      `Voting closes ${formatSgtDateTime(votingWindow.closesAt)}.`,
+    );
+    assert.equal(await voter.$eval('.voter__rule', (node) => node.textContent), RULE_LINE);
+    assert.equal(`${OPEN_H1} Voting closes ${formatSgtDateTime(votingWindow.closesAt)}.`,
+      'Vote your favourite lookalike now! Voting closes Thu 5 Nov, 11:59pm SGT.');
   });
 
   await step('all 20 contestants are numbered 1 to 20 and use generated placeholders, not photos', async () => {
@@ -758,7 +796,7 @@ async function partA(browser: Browser, site: string): Promise<void> {
 
   await step('tap a contestant: the confirm step asks for an email, set up for phone keyboards', async () => {
     await press(voter, 'During voting');
-    await see(voter, `Who makes the Top ${event.advancing}?`);
+    await see(voter, OPEN_H1);
     await pickCard(voter, 7);
     await see(voter, 'Vote for #7 Contestant 7?');
     const field = await voter.$eval('#voter-email', (input) => {
@@ -820,15 +858,38 @@ async function partA(browser: Browser, site: string): Promise<void> {
     await shot(voter, 'demo-03b-vote-confirm-error');
   });
 
-  await step('confirm: voted', async () => {
+  await step('confirm: voted, and the promo pops up', async () => {
     await typeEmail(voter, EMAIL.alice);
     await press(voter, 'Confirm vote', 'dialog.sheet');
     await see(voter, 'Vote in!');
-    await see(voter, 'You voted for #7 Contestant 7.');
+    await see(voter, `You voted for #7 Contestant 7. ${TOP10_LINE}`);
     await see(voter, 'Done. Your vote is counted.');
     assert.equal(await cardsDisabled(voter), true, 'a voted browser shows its vote, not a fresh ballot');
+    await checkPromo(voter, 'pop-up');
+    await shot(voter, 'demo-04a-promo-popup');
+  });
+
+  await step("Rev 10: the phone's Back closes the pop-up and stays on the page, message in view", async () => {
+    const before = voter.url();
+    await voter.goBack();
+    await voter.waitForFunction(() => document.querySelector('dialog.sheet--promo[open]') === null, { timeout: 5_000 });
+    assert.equal(voter.url(), before, 'Back left the voting page');
+    const top = await voter.$eval('.voter__intro h1', (node) => node.getBoundingClientRect().top);
+    assert.ok(top >= 0 && top < 300, `the "Vote in!" message is not on screen after the vote (top ${top})`);
     await shot(voter, 'demo-04-vote-counted');
-    await checkPromo(voter, 'after-vote');
+    await checkPromo(voter, 'bottom');
+  });
+
+  await step('Rev 10: "See all contestants" brings back every contestant, still locked', async () => {
+    await press(voter, 'See all contestants');
+    await voter.waitForFunction(() => {
+      const grid = document.querySelector('.grid')?.getBoundingClientRect();
+      return grid !== undefined && grid.top >= 0 && grid.top < 120;
+    }, { timeout: 5_000 });
+    assert.equal((await voter.$$('.grid > li')).length, 20);
+    assert.equal(await cardsDisabled(voter), true);
+    await shot(voter, 'demo-04b-see-all-contestants');
+    await voter.evaluate(() => window.scrollTo(0, 0));
   });
 
   await step('backing out of the confirm sheet casts nothing', async () => {
@@ -836,7 +897,7 @@ async function partA(browser: Browser, site: string): Promise<void> {
     const page = await open(other, `${site}/`);
     await pickCard(page, 2);
     await press(page, 'Back', 'dialog.sheet');
-    await see(page, `Who makes the Top ${event.advancing}?`);
+    await see(page, OPEN_H1);
     assert.equal(await page.$('.card--chosen'), null);
     await other.close();
   });
@@ -857,7 +918,7 @@ async function partA(browser: Browser, site: string): Promise<void> {
 
   await step('the same email again, from the same phone, is refused with the plain message', async () => {
     await press(voter, ANOTHER_PERSON);
-    await see(voter, `Who makes the Top ${event.advancing}?`);
+    await see(voter, OPEN_H1);
     await voteFor(voter, 3, EMAIL.alice);
     await see(voter, DUPLICATE);
     assert.equal((await text(voter)).includes('Vote in!'), false);
@@ -887,12 +948,13 @@ async function partA(browser: Browser, site: string): Promise<void> {
   await step('after the window: closed, with the Top 10 date', async () => {
     await press(voter, 'After voting closes');
     await see(voter, 'Voting has closed');
-    await see(voter, `Top ${event.advancing} announced on ${formatCalendarDate(event.top10AnnouncedOn)}.`);
+    await see(voter, TOP10_LINE);
+    assert.ok(TOP10_LINE === 'Top 10 will be announced Saturday, 7 Nov.', TOP10_LINE);
     assert.equal(await cardsDisabled(voter), true);
     await shot(voter, 'demo-07-vote-closed');
     await checkPromo(voter, 'bottom');
     await press(voter, 'During voting');
-    await see(voter, `Who makes the Top ${event.advancing}?`);
+    await see(voter, OPEN_H1);
   });
 
   await step('works from a sub-folder, as it will be served on GitHub Pages', async () => {
@@ -1058,14 +1120,14 @@ async function partA(browser: Browser, site: string): Promise<void> {
     assert.equal(await cardsDisabled(voter), true);
     await press(admin, 'Reopen voting');
     await see(admin, 'Voting is set to open.');
-    await see(voter, `Who makes the Top ${event.advancing}?`);
+    await see(voter, OPEN_H1);
   });
 
   await step('admin: reset clears the demo', async () => {
     await press(admin, 'Reset demo');
     await see(admin, 'Demo data reset.');
     await votesCounted(admin, 0);
-    await see(voter, `Who makes the Top ${event.advancing}?`);
+    await see(voter, OPEN_H1);
     assert.equal((await text(voter)).includes('Last sample address'), false);
   });
 
@@ -1075,7 +1137,7 @@ async function partA(browser: Browser, site: string): Promise<void> {
     const sampleContext = await browser.createBrowserContext();
     const page = await open(sampleContext, `${site}/`, { viewport: LAPTOP, before: captureDownloads });
     page.on('dialog', (dialog) => void dialog.accept());
-    await see(page, `Who makes the Top ${event.advancing}?`);
+    await see(page, OPEN_H1);
     // Typed the way people type: odd capitals and spaces, a Gmail alias, and one
     // address a spreadsheet would try to run as a formula.
     await voteFor(page, 3, '  Alice.Tan@Example.com ');
@@ -1131,50 +1193,52 @@ async function partA(browser: Browser, site: string): Promise<void> {
  */
 async function checkPromo(
   page: Page,
-  expected: 'bottom' | 'after-vote',
+  expected: 'bottom' | 'pop-up',
   options: { link?: string; phone?: boolean } = {},
 ): Promise<void> {
-  await page.evaluate(() => document.querySelector('.promo-banner')?.scrollIntoView({ block: 'center' }));
-  await page.waitForFunction(() => {
-    const image = document.querySelector<HTMLImageElement>('.promo-banner img');
+  const selector = expected === 'pop-up' ? 'dialog.sheet--promo[open] .promo-banner' : 'main .promo-banner';
+  await page.waitForSelector(selector, { timeout: 10_000 });
+  if (expected === 'bottom') {
+    await page.evaluate((sel: string) => document.querySelector(sel)?.scrollIntoView({ block: 'center' }), selector);
+  }
+  await page.waitForFunction((sel: string) => {
+    const image = document.querySelector<HTMLImageElement>(`${sel} img`);
     return image !== null && image.complete && image.naturalWidth > 0;
-  });
-  const promo = await page.evaluate(() => {
-    const all = [...document.querySelectorAll<HTMLElement>('.promo-banner')];
-    const node = all[0];
+  }, {}, selector);
+  const promo = await page.evaluate((sel: string) => {
+    const node = document.querySelector<HTMLElement>(sel);
     const image = node?.querySelector('img');
     const grid = document.querySelector('.grid')?.getBoundingClientRect();
-    const save = document.querySelector('.voter__save:not(:empty)')?.getBoundingClientRect() ?? null;
     const box = node?.getBoundingClientRect();
-    const main = document.querySelector('main')?.getBoundingClientRect();
+    const column = (node?.closest('.sheet__body') ?? document.querySelector('main'))?.getBoundingClientRect();
     return {
-      count: all.length,
-      inSheet: document.querySelector('dialog .promo-banner') !== null,
+      count: document.querySelectorAll(sel).length,
+      inConfirmSheet: document.querySelector('dialog.sheet:not(.sheet--promo) .promo-banner') !== null,
       placement: node?.dataset.placement ?? '',
       tag: node?.tagName.toLowerCase() ?? '',
       href: node?.getAttribute('href'),
       target: node?.getAttribute('target'),
       rel: node?.getAttribute('rel'),
       ratio: box ? box.width / box.height : 0,
-      widthMatchesColumn: box && main ? Math.abs(box.width - (main.width - 32)) <= 1 : false,
+      widthMatchesColumn: box && column ? Math.abs(box.width - (column.width - 32)) <= 1 : false,
       afterGrid: box && grid ? box.top >= grid.bottom : false,
-      beforeGrid: box && grid ? box.bottom <= grid.top : false,
-      afterSave: box && save ? box.top >= save.bottom : true,
       radius: node ? getComputedStyle(node).borderTopLeftRadius : '',
       loading: image?.loading ?? '',
       filter: image ? getComputedStyle(image).filter : '',
       alt: image?.alt ?? '',
       src: image?.currentSrc ?? '',
       text: (node?.textContent ?? '').trim(),
+      closeButton:
+        [...(node?.closest('dialog')?.querySelectorAll('button') ?? [])].map((b) => (b.textContent ?? '').trim()),
     };
-  });
-  assert.equal(promo.count, 1, 'expected exactly one promo banner');
-  assert.equal(promo.inSheet, false, 'the promo banner is inside the confirm sheet');
+  }, selector);
+  assert.equal(promo.count, 1, `expected exactly one promo banner (${expected})`);
+  assert.equal(promo.inConfirmSheet, false, 'the promo banner is inside the confirm sheet');
   assert.equal(promo.placement, expected);
   if (expected === 'bottom') assert.ok(promo.afterGrid, 'the promo banner should come after the contestants');
-  else assert.ok(promo.beforeGrid && promo.afterSave, 'the promo banner should sit between the vote message and the grid');
-  assert.ok(promo.widthMatchesColumn, 'the promo banner is not the width of the content column');
-  // The real config now has a 16:9 phone image, used below 640px: so does the stand-in build.
+  else assert.deepEqual(promo.closeButton, ['Close'], 'the pop-up should hold the creative and one Close button');
+  assert.ok(promo.widthMatchesColumn, 'the promo banner is not the width of its column');
+  // The real config has a 16:9 phone image, used below 640px: so does the stand-in build.
   const phone = options.phone ?? (await page.evaluate(() => window.innerWidth < 640));
   const wantRatio = phone ? 16 / 9 : 3;
   assert.ok(Math.abs(promo.ratio - wantRatio) < 0.02, `promo ratio ${promo.ratio}, expected ${wantRatio}`);
@@ -1185,7 +1249,7 @@ async function checkPromo(
     assert.ok(promo.src.endsWith(phone ? 'phone-stand-in.svg' : '1920x640.jpg'), `promo shows ${promo.src}`);
   }
   assert.equal(promo.radius, '4px');
-  assert.equal(promo.loading, 'lazy');
+  assert.equal(promo.loading, expected === 'pop-up' ? 'eager' : 'lazy');
   assert.equal(promo.filter, 'none', 'the photo treatment must not reach the promo banner');
   assert.equal(promo.text, '', 'the promo banner must carry no text of its own');
   if (options.link === undefined) {
@@ -1197,7 +1261,7 @@ async function checkPromo(
     assert.equal(promo.target, '_blank');
     assert.equal(promo.rel, 'noopener noreferrer');
   }
-  await page.evaluate(() => window.scrollTo(0, 0));
+  if (expected === 'bottom') await page.evaluate(() => window.scrollTo(0, 0));
 }
 
 type BannerVariant = 'placeholder' | 'real' | 'kv';
@@ -1219,7 +1283,10 @@ async function checkBanner(page: Page, variant: BannerVariant, viewport: Viewpor
       placeholder: node.classList.contains('key-visual--placeholder'),
       text: node.textContent ?? '',
       ratio: box.width / box.height,
-      widthMatchesColumn: main ? Math.abs(box.width - (main.width - 32)) <= 1 : false,
+      // Revision 10: edge to edge, up to the desktop creative's own 1920px.
+      fullBleed: Math.abs(box.width - Math.min(document.documentElement.clientWidth, 1920)) <= 1,
+      flushTop: Math.abs(box.top + window.scrollY - (document.querySelector('.demo-banner')?.getBoundingClientRect().bottom ?? 0)) <= 1,
+      mainBelow: main ? main.top >= box.bottom - 1 : false,
       aboveHeader: (document.querySelector('.voter__top')?.getBoundingClientRect().top ?? 0) >= box.bottom,
       radius: getComputedStyle(node).borderTopLeftRadius,
       image: image
@@ -1233,9 +1300,11 @@ async function checkBanner(page: Page, variant: BannerVariant, viewport: Viewpor
         : null,
     };
   });
-  assert.ok(banner.widthMatchesColumn, 'banner is not the full width of the content column');
+  assert.ok(banner.fullBleed, 'banner does not run edge to edge');
+  assert.ok(banner.flushTop, 'banner has a gap above it');
+  assert.ok(banner.mainBelow, 'banner is not above the page column');
   assert.ok(banner.aboveHeader, 'banner is not above the header');
-  assert.equal(banner.radius, '4px');
+  assert.equal(banner.radius, '0px');
   if (variant === 'placeholder') {
     assert.equal(banner.placeholder, true);
     assert.match(banner.text, /Key visual goes here/);
@@ -1289,7 +1358,7 @@ async function layouts(browser: Browser, site: string, variant: 'real' | 'kv'): 
     };
 
     await step(`${name}px: open grid`, async () => {
-      await see(page, `Who makes the Top ${event.advancing}?`);
+      await see(page, OPEN_H1);
       await fits('open grid');
       assert.deepEqual(await smallTargets(page, '.grid'), [], `${name}px: small contestant cards`);
       const columns = await page.$eval('.grid', (grid) => getComputedStyle(grid).gridTemplateColumns.split(' ').length);
@@ -1316,11 +1385,7 @@ async function layouts(browser: Browser, site: string, variant: 'real' | 'kv'): 
         if (width === '390') firstScreens['real, H1 visually hidden (option, not shipped), public view'] = await measureFirstScreen(page, true);
         await hide.evaluate((node) => node.remove());
       }
-      await checkPromo(page, 'bottom', promoOptions);
-      // The promo sits below the fold when not voted: show it as it looks scrolled into view.
-      await page.evaluate(() => document.querySelector('.promo-banner')?.scrollIntoView({ block: 'end' }));
-      await shot(page, `${prefix}-${width}-1c-promo-bottom`);
-      await page.evaluate(() => window.scrollTo(0, 0));
+      await noPromoYet(page);
       if (variant === 'kv') {
         await page.evaluate(() => document.querySelector('.grid')?.scrollIntoView());
         await shot(page, `${prefix}-${width}-1b-grid-photos`);
@@ -1408,8 +1473,12 @@ async function layouts(browser: Browser, site: string, variant: 'real' | 'kv'): 
       await press(page, 'Confirm vote', 'dialog.sheet');
       await see(page, 'You voted for #1 Contestant 1.');
       await see(page, 'Done. Your vote is counted.');
+      await checkPromo(page, 'pop-up', promoOptions);
+      await fits('promo pop-up');
+      await shot(page, `${prefix}-${width}-3a-promo-popup`);
+      await press(page, 'Close', 'dialog.sheet--promo');
+      await page.waitForFunction(() => document.querySelector('dialog.sheet--promo[open]') === null);
       await fits('voted');
-      await checkPromo(page, 'after-vote', promoOptions);
       if (width === '390') {
         votedScreens[`${variant}, demo notice showing`] = await measureVotedScreen(page, false);
         votedScreens[`${variant}, as the public sees it (no demo notice)`] = await measureVotedScreen(page, true);
@@ -1419,6 +1488,8 @@ async function layouts(browser: Browser, site: string, variant: 'real' | 'kv'): 
       }
       assert.deepEqual(await smallTargets(page, '.voter__intro'), [], `${name}px: small targets in the intro`);
       await shot(page, `${prefix}-${width}-3-voted`);
+      await checkPromo(page, 'bottom', promoOptions);
+      await page.evaluate(() => window.scrollTo(0, 0));
     });
 
     await step(`${name}px: duplicate email refused`, async () => {
@@ -1510,7 +1581,7 @@ async function partB(
   const home = await open(first, `${site}/`);
 
   await step('no DEMO banner and no demo controls on the production build', async () => {
-    await see(home, `Who makes the Top ${event.advancing}?`);
+    await see(home, OPEN_H1);
     const body = await text(home);
     assert.equal(body.includes('DEMO DATA'), false);
     assert.equal(body.includes('Demo controls'), false);
@@ -1521,12 +1592,12 @@ async function partB(
     const context = await browser.createBrowserContext();
     for (const { name, viewport } of LAYOUTS) {
       const page = await open(context, `${site}/`, { viewport });
-      await see(page, `Who makes the Top ${event.advancing}?`);
+      await see(page, OPEN_H1);
       await checkBanner(page, 'real', viewport);
       assert.deepEqual(await overflowing(page), [], `${name}px: wider than the screen`);
-      const firstChild = await page.$eval('main.voter', (main) => main.firstElementChild?.className);
+      const firstChild = await page.$eval('.app', (app) => app.firstElementChild?.className);
       assert.equal(firstChild, 'kv-band kv-band--desktop', 'the key visual should be the first thing on the page');
-      await checkPromo(page, 'bottom');
+      await noPromoYet(page);
       if (name === '390') firstScreens['production build, real key visual'] = await measureFirstScreen(page, false);
       await shot(page, `layout-prod-${name}-1-open`);
       await page.close();
@@ -1544,7 +1615,7 @@ async function partB(
   await step('a second person on the same network (same IP) votes with their own email', async () => {
     const context = await browser.createBrowserContext();
     const flatmate = await open(context, `${site}/`);
-    await see(flatmate, `Who makes the Top ${event.advancing}?`);
+    await see(flatmate, OPEN_H1);
     assert.equal(await cardsDisabled(flatmate), false, 'a shared network must not block anyone');
     await voteFor(flatmate, 5, EMAIL.flatmate);
     await see(flatmate, 'You voted for #5 Contestant 5.');
@@ -1556,7 +1627,7 @@ async function partB(
   await step('an email that has already voted is refused by the server, with the plain message', async () => {
     const context = await browser.createBrowserContext();
     const colleague = await open(context, `${site}/`);
-    await see(colleague, `Who makes the Top ${event.advancing}?`);
+    await see(colleague, OPEN_H1);
     // The same person already voted from another device while this page sat open.
     const other = await callApi('vote', {
       contestantId: 'c09',
@@ -1626,7 +1697,7 @@ async function partB(
   await step('connection drops mid-vote: retry, honest failure message, then recovery', async () => {
     const context = await browser.createBrowserContext();
     const train = await open(context, `${site}/`);
-    await see(train, `Who makes the Top ${event.advancing}?`);
+    await see(train, OPEN_H1);
 
     await api.pause();
     await voteFor(train, 14, EMAIL.train);
@@ -1653,7 +1724,7 @@ async function partB(
     await shot(page, 'prod-06-unreachable');
     await api.resume();
     await press(page, 'Try again');
-    await see(page, `Who makes the Top ${event.advancing}?`);
+    await see(page, OPEN_H1);
     await context.close();
   });
 
@@ -1664,7 +1735,7 @@ async function partB(
       `${site}/?fbclid=IwZXh0bgNhZW0CMTEAAR3&igsh=MWZ4dGVzdA%3D%3D&utm_source=ig`,
       { userAgent: INSTAGRAM_UA },
     );
-    await see(page, `Who makes the Top ${event.advancing}?`);
+    await see(page, OPEN_H1);
     await voteFor(page, 20, EMAIL.instagram);
     await see(page, 'You voted for #20 Contestant 20.');
     assert.equal(await voteCount(), 6);
@@ -1686,7 +1757,7 @@ async function partB(
     assert.equal(await voteCount(), 7);
     // With nowhere to keep the marker the page forgets, but the server does not.
     await page.reload({ waitUntil: 'load' });
-    await see(page, `Who makes the Top ${event.advancing}?`);
+    await see(page, OPEN_H1);
     await voteFor(page, 9, EMAIL.locked);
     await see(page, DUPLICATE);
     assert.equal(await voteCount(), 7);
@@ -1768,7 +1839,7 @@ async function partB(
     await home.reload({ waitUntil: 'load' });
     await see(home, 'Voting has closed');
     await see(home, 'Your vote for #5 Contestant 5 is in.');
-    await see(home, `Top ${event.advancing} announced on ${formatCalendarDate(event.top10AnnouncedOn)}.`);
+    await see(home, TOP10_LINE);
     await shot(home, 'prod-09-vote-closed');
     await press(admin, 'Reopen voting');
     await see(admin, 'Voting is set to open.');
@@ -1894,7 +1965,7 @@ async function placeholderLayouts(browser: Browser, site: string): Promise<void>
     const context = await browser.createBrowserContext();
     for (const { name, viewport } of LAYOUTS) {
       const page = await open(context, `${site}/`, { viewport });
-      await see(page, `Who makes the Top ${event.advancing}?`);
+      await see(page, OPEN_H1);
       await checkBanner(page, 'placeholder', viewport);
       assert.equal(await page.$('.kv-band'), null, `${name}px: the colour band belongs to a real image only`);
       assert.deepEqual(await overflowing(page), [], `${name}px: wider than the screen`);
@@ -1911,13 +1982,13 @@ async function productionWithoutKeyVisual(browser: Browser, site: string): Promi
     const context = await browser.createBrowserContext();
     for (const { name, viewport } of LAYOUTS) {
       const page = await open(context, `${site}/`, { viewport });
-      await see(page, `Who makes the Top ${event.advancing}?`);
+      await see(page, OPEN_H1);
       assert.equal(await page.$('.key-visual'), null, `${name}px: a banner slot is showing`);
       assert.equal(await page.$('.kv-band'), null, `${name}px: a colour band is showing`);
       assert.equal((await text(page)).includes('Key visual'), false);
       const firstChild = await page.$eval('main.voter', (main) => main.firstElementChild?.className);
       assert.equal(firstChild, 'voter__top', 'the header should be first when there is no key visual');
-      await checkPromo(page, 'bottom');
+      await noPromoYet(page);
       if (name === '390') firstScreens['production build, no key visual'] = await measureFirstScreen(page, false);
       await shot(page, `layout-prod-no-kv-${name}-1-open`);
       await page.close();

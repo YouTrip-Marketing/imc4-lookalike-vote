@@ -534,8 +534,8 @@ body:has(.kv-band) {
 }
 
 .voter__save + .promo-banner,
-.promo-banner[data-placement='after-vote'] {
-  margin: 16px 0 0;
+.promo-banner[data-placement='pop-up'] {
+  margin: 0;
 }
 
 .promo-banner picture,
@@ -1407,4 +1407,90 @@ a.promo-banner:focus-visible {
   .button:active:not(:disabled) {
     transform: none;
   }
+}
+
+/* ---------- Revision 10 (2026-10-13): Kelicia's test feedback ---------- */
+
+/*
+ * Key visual edge to edge: it now sits outside the padded column, so on a phone
+ * there is no gap at the sides or above it, and no rounded corners. Very wide
+ * screens stop at the desktop creative's own width (1920px); the colour band
+ * carries on beside it.
+ */
+.kv-band,
+.app > .key-visual {
+  max-width: 1920px;
+  margin: 0 auto;
+}
+
+.kv-band > .key-visual,
+.key-visual {
+  margin: 0;
+  border-radius: 0;
+}
+
+/* The status pill is alone on its row now that the brand line is gone. */
+.voter__top {
+  justify-content: flex-start;
+}
+
+/* Green dot while voting is open; grey before; red once closed. */
+.pill--open .pill__dot {
+  background: #3ddc84;
+  box-shadow: 0 0 0 3px rgba(61, 220, 132, 0.22);
+}
+
+.pill--not_open .pill__dot {
+  background: var(--faint);
+}
+
+.voter__rule {
+  margin-top: 8px;
+  color: var(--white);
+  font-size: 1rem;
+  font-weight: 500;
+  text-wrap: pretty;
+}
+
+.voter__see-all {
+  margin-top: 16px;
+  border-color: var(--lilac);
+  background: transparent;
+  color: var(--white);
+  font-weight: 700;
+}
+
+.voter__see-all:hover {
+  background: rgba(183, 148, 255, 0.12);
+}
+
+.grid:focus {
+  outline: none;
+}
+
+/* The post-vote promo pop-up: the creative as large as the screen allows, then Close. */
+.sheet--promo {
+  width: min(100% - 32px, 720px);
+}
+
+.sheet--promo .sheet__body {
+  padding: 16px 16px calc(16px + env(safe-area-inset-bottom));
+}
+
+.sheet--promo .sheet__actions {
+  margin-top: 12px;
+}
+
+/* "See all contestants" and the post-vote scroll stop clear of the sticky TEST SITE / DEMO DATA bar. */
+.grid,
+main.voter {
+  scroll-margin-top: 0;
+}
+
+.app:has(.demo-banner) .grid {
+  scroll-margin-top: 52px;
+}
+
+.app:has(.demo-banner) main.voter {
+  scroll-margin-top: 36px;
 }

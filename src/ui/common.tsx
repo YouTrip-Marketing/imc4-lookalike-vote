@@ -82,7 +82,11 @@ export function Message({ tone = 'neutral', title, children, action }: MessagePr
 interface SheetProps {
   open: boolean;
   onClose: () => void;
-  labelledBy: string;
+  /** Id of the element that names the sheet. Or give `label` when it has no heading. */
+  labelledBy?: string;
+  label?: string;
+  /** Extra class on the dialog, e.g. 'sheet--promo'. */
+  className?: string;
   children: ReactNode;
 }
 
@@ -132,7 +136,7 @@ function useVisibleArea(active: boolean): void {
  * only reached iOS in 15.4. Where showModal is missing the sheet falls back to
  * the `open` attribute plus a CSS class that draws the backdrop itself.
  */
-export function Sheet({ open, onClose, labelledBy, children }: SheetProps): JSX.Element {
+export function Sheet({ open, onClose, labelledBy, label, className, children }: SheetProps): JSX.Element {
   const ref = useRef<HTMLDialogElement>(null);
   useVisibleArea(open);
 
@@ -156,8 +160,9 @@ export function Sheet({ open, onClose, labelledBy, children }: SheetProps): JSX.
   return (
     <dialog
       ref={ref}
-      className="sheet"
+      className={className === undefined ? 'sheet' : `sheet ${className}`}
       aria-labelledby={labelledBy}
+      aria-label={labelledBy === undefined ? label : undefined}
       onClose={onClose}
       onCancel={onClose}
       onClick={(clickEvent) => {

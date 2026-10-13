@@ -100,3 +100,15 @@ export function formatCalendarDate(date: string): string {
   if (Number.isNaN(value.getTime())) return date;
   return `${DAYS[value.getUTCDay()]} ${value.getUTCDate()} ${MONTHS[value.getUTCMonth()]}`;
 }
+
+const LONG_DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+/** "Saturday, 7 Nov" for 2026-11-07 (Revision 10 wording). The input is a calendar date, not an instant. */
+export function formatLongCalendarDate(date: string): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date);
+  if (match === null) return date;
+  const [, year, month, day] = match;
+  const value = new Date(Date.UTC(Number(year), Number(month) - 1, Number(day)));
+  if (Number.isNaN(value.getTime())) return date;
+  return `${LONG_DAYS[value.getUTCDay()]}, ${value.getUTCDate()} ${MONTHS[value.getUTCMonth()]}`;
+}

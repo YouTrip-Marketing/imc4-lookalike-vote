@@ -3,8 +3,8 @@
  *
  *   event         - title and the copy that frames the vote
  *   keyVisual     - the banner image at the top of the voting page
- *   promoBanner   - the campaign promo banner (bottom of the page; under the
- *                   "vote counted" message once the visitor has voted)
+ *   promoBanner   - the campaign promo banner (Revision 10: pops up straight
+ *                   after a vote; also at the bottom once voted or not open)
  *   contestants   - the 20 in the vote
  *   votingWindow  - when voting opens and closes (Singapore time)
  *   votingRules   - whether a vote can be changed, public counts

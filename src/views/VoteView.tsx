@@ -13,7 +13,7 @@ import { DemoVoterPanel } from '../demo/lazy';
 import { checkEmail, type EmailProblem } from '../domain/email';
 import { toVoteError, type VoteError } from '../domain/errors';
 import { newRequestId } from '../domain/requestId';
-import { formatCalendarDate, formatSgtDateTime } from '../domain/time';
+import { formatLongCalendarDate, formatSgtDateTime } from '../domain/time';
 import type { Contestant, PublicSession, VotingStatus } from '../domain/types';
 import { usePolling } from '../hooks/usePolling';
 import { browserStorage } from '../storage/keyValue';
@@ -26,9 +26,9 @@ import {
 } from '../storage/voteMarker';
 import { hasDemoControls, type VoteStore } from '../storage';
 import { ContestantArt } from '../ui/ContestantArt';
-import { Brand, Message, Sheet, Spinner, StatusPill } from '../ui/common';
+import { Message, Sheet, Spinner, StatusPill } from '../ui/common';
 import { KeyVisualBanner } from '../ui/KeyVisual';
-import { PromoBannerSlot } from '../ui/PromoBanner';
+import { PromoBannerSlot, PromoPopup } from '../ui/PromoBanner';
 
 type CastState =
   | { phase: 'idle' }
@@ -78,6 +78,10 @@ export function VoteView({ store }: { store: VoteStore }): JSX.Element {
   const [email, setEmail] = useState('');
   const [emailError, setEmailError] = useState<string | null>(null);
   const announcer = useRef<HTMLParagraphElement>(null);
+  const grid = useRef<HTMLUListElement>(null);
+  // Revision 10: the promo pops up once, straight after a vote is counted.
+  const [promoOpen, setPromoOpen] = useState(false);
+  const closePromo = useCallback(() => setPromoOpen(false), []);
 
   const subscribe = useCallback((listener: () => void) => store.subscribe(listener), [store]);
   const load = useCallback(() => store.getSession(), [store]);
@@ -115,8 +119,18 @@ export function VoteView({ store }: { store: VoteStore }): JSX.Element {
     }
   }, [status]);
 
+  const intro = useRef<HTMLElement>(null);
   useEffect(() => {
-    if (cast.phase === 'counted' || cast.phase === 'failed') announcer.current?.focus();
+    if (cast.phase === 'counted') {
+      // Revision 10: back up to the "Vote in!" message (the visitor voted from
+      // somewhere down the grid), THEN the promo pops up over it. In that order,
+      // so closing the pop-up hands focus back to the message, not the card.
+      (intro.current?.closest('main') ?? intro.current)?.scrollIntoView({ block: 'start' });
+      announcer.current?.focus({ preventScroll: true });
+      setPromoOpen(true);
+    } else if (cast.phase === 'failed') {
+      announcer.current?.focus();
+    }
   }, [cast.phase]);
 
   const openSheet = (contestant: Contestant): void => {
@@ -177,6 +191,13 @@ export function VoteView({ store }: { store: VoteStore }): JSX.Element {
    * person uses the same phone, forgetting it lets them vote with their own
    * email. It gains nobody a second vote: the server still checks the email.
    */
+  /** Revision 10: after voting, straight back to every contestant. */
+  const showAllContestants = (): void => {
+    setPromoOpen(false);
+    grid.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    grid.current?.focus({ preventScroll: true });
+  };
+
   const forgetThisBrowser = (): void => {
     clearVoteMarker(storage, event.id);
     setMarker(null);
@@ -237,18 +258,22 @@ export function VoteView({ store }: { store: VoteStore }): JSX.Element {
     );
   }
 
-  // The promo banner sits under the "vote counted" message while voting is open
-  // and this browser has voted; everywhere else (not voted, not open, closed,
-  // sending) it sits at the bottom of the page.
-  const promoAfterVote = voted && status === 'open' && !sending;
+  // Revision 10: the promo pops up after a vote. Before a vote it is not on the
+  // page at all; once this browser has voted, or voting is not open, it also
+  // sits at the bottom, under the contestants.
+  const promoAtBottom = (voted || status !== 'open') && !sending;
 
   const opens = formatSgtDateTime(session.state.opensAt);
   const closes = formatSgtDateTime(session.state.closesAt);
-  const announced = formatCalendarDate(event.top10AnnouncedOn);
+  // Kelicia's wording, Revision 10.
+  const top10Line = `Top ${event.advancing} will be announced ${formatLongCalendarDate(event.top10AnnouncedOn)}.`;
+  const ruleLine = canChange
+    ? 'You can switch until voting closes.'
+    : 'One vote per person. It cannot be changed once you confirm.';
 
   return (
     <VoteShell status={status} offline={polled.error !== null} demoPanel={demoPanel}>
-      <header className="voter__intro">
+      <header ref={intro} className="voter__intro">
         <h1>
           {sending
             ? 'Sending your vote'
@@ -258,7 +283,7 @@ export function VoteView({ store }: { store: VoteStore }): JSX.Element {
                 ? 'Voting opens soon'
                 : voted
                   ? 'Vote in!'
-                  : `Who makes the Top ${event.advancing}?`}
+                  : 'Vote your favourite lookalike now!'}
         </h1>
         <p className="voter__lede">
           {sending && (
@@ -267,7 +292,7 @@ export function VoteView({ store }: { store: VoteStore }): JSX.Element {
           {!sending && status === 'closed' && (
             <>
               {votedFor !== undefined && <>Your vote for {nameOf(votedFor)} is in. </>}
-              Top {event.advancing} announced on {announced}.
+              {top10Line}
             </>
           )}
           {!sending && status === 'not_open' && (
@@ -283,19 +308,17 @@ export function VoteView({ store }: { store: VoteStore }): JSX.Element {
               ) : (
                 <>Your vote is in. </>
               )}
-              {canChange
-                ? 'Changed your mind? You can switch until voting closes.'
-                : `Top ${event.advancing} announced on ${announced}.`}
+              {canChange ? 'Changed your mind? You can switch until voting closes.' : top10Line}
             </>
           )}
-          {!sending && status === 'open' && !voted && (
-            <>
-              {contestants.length} contestants, {event.advancing} spots in the live final. Tap your
-              favourite, then confirm.
-              {closes !== '' && <> Voting closes {closes}.</>}
-            </>
-          )}
+          {!sending && status === 'open' && !voted && closes !== '' && <>Voting closes {closes}.</>}
         </p>
+        {!sending && status === 'open' && !voted && <p className="voter__rule">{ruleLine}</p>}
+        {!sending && status === 'open' && voted && (
+          <button type="button" className="button button--wide voter__see-all" onClick={showAllContestants}>
+            See all contestants
+          </button>
+        )}
         {!sending && status === 'open' && voted && !canChange && (
           <button type="button" className="text-button" onClick={forgetThisBrowser}>
             Someone else voting on this phone? Vote with their email
@@ -330,10 +353,7 @@ export function VoteView({ store }: { store: VoteStore }): JSX.Element {
         </button>
       )}
 
-      {/* Once this visitor has voted, attention is on the confirmation: the promo goes here. */}
-      {promoAfterVote && <PromoBannerSlot placement="after-vote" />}
-
-      <ul className="grid" aria-label="Contestants">
+      <ul ref={grid} className="grid" aria-label="Contestants" tabIndex={-1}>
         {contestants.map((contestant) => {
           const chosen = marker?.contestantId === contestant.id;
           return (
@@ -369,7 +389,8 @@ export function VoteView({ store }: { store: VoteStore }): JSX.Element {
         })}
       </ul>
 
-      {!promoAfterVote && <PromoBannerSlot placement="bottom" />}
+      {promoAtBottom && <PromoBannerSlot placement="bottom" />}
+
 
       <Sheet open={picked !== null} onClose={() => setPicked(null)} labelledBy="confirm-title">
         {picked !== null && (
@@ -396,11 +417,7 @@ export function VoteView({ store }: { store: VoteStore }): JSX.Element {
                 <h2 id="confirm-title">
                   {voted ? `Switch your vote to ${nameOf(picked)}?` : `Vote for ${nameOf(picked)}?`}
                 </h2>
-                <p>
-                  {canChange
-                    ? 'You can switch until voting closes.'
-                    : 'One vote per person. It cannot be changed once it is in.'}
-                </p>
+                <p>{ruleLine}</p>
                 <div className="field">
                   <label htmlFor="voter-email">Your email</label>
                   <input
@@ -446,6 +463,8 @@ export function VoteView({ store }: { store: VoteStore }): JSX.Element {
           </>
         )}
       </Sheet>
+
+      <PromoPopup open={promoOpen && cast.phase === 'counted'} onClose={closePromo} />
     </VoteShell>
   );
 }
@@ -484,20 +503,25 @@ function VoteShell({
   offline?: boolean;
   demoPanel: ReactNode;
 }): JSX.Element {
+  // Revision 10: the key visual sits outside the padded column, edge to edge,
+  // and the brand line under it is gone (the key visual carries the title).
   return (
-    <main className="voter">
+    <>
       <KeyVisualBanner />
-      <div className="voter__top">
-        <Brand />
-        {status !== undefined && <StatusPill status={status} />}
-      </div>
+      <main className="voter">
+        {status !== undefined && (
+          <div className="voter__top">
+            <StatusPill status={status} />
+          </div>
+        )}
       {offline && (
         <p className="offline" role="status">
           Connection lost. Reconnecting...
         </p>
       )}
-      {children}
-      {demoPanel}
-    </main>
+        {children}
+        {demoPanel}
+      </main>
+    </>
   );
 }
