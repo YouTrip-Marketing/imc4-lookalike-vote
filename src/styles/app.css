@@ -1,0 +1,1410 @@
+/*
+ * SPOTLIGHT ARENA (Revision 4, chosen by Kelicia 2026-09-29).
+ * Design source: research/outbox/imc4-voting-site-visual-references.html, Direction 3.
+ *
+ * Near-black stage, purple spotlight from above, every contestant photo in
+ * high-contrast mono toned purple, giant outlined numerals, heavy caps names.
+ *
+ * LIME IS RESERVED for the vote action and the selected state. Do not use
+ * --lime for anything else.
+ *
+ * One typeface, Poppins, YouTrip's brand font (Revision 6, 2026-09-30),
+ * self-hosted (see src/main.tsx): 800 for headlines and the outlined numerals,
+ * 700 for names, buttons and headings, 400/500 for everything else. Poppins is
+ * much wider than the condensed Anton it replaced, so display sizes are smaller.
+ */
+:root {
+  /*
+   * Revision 8 (2026-10-05): the base colours are re-tuned to Kelicia's "Top 20"
+   * key visual. --stage is the key visual's own darkest purple (left edge of the
+   * phone image, sampled #12003C); cards and lines are lifted from it in the same
+   * hue. Was: stage #0B0A12, card #1A1626, card-2 #231D33, line #33294A,
+   * line-soft #241F33 (neutral grey-purples that looked grey next to the KV).
+   */
+  --stage: #12003c;
+  --stage-rgb: 18, 0, 60;
+  --card: #1c0b47;
+  --card-2: #26115a;
+  --line: #3a2170;
+  --line-soft: #251150;
+  --purple: #7b3fe4;
+  --purple-hover: #8d55ee;
+  --lilac: #b794ff;
+  --lime: #d7ff3d;
+  --white: #f4f1ff;
+  --muted: #cfc6e4;
+  --faint: #9e94b8;
+  --danger: #ff6b81;
+  /* Functional only: warnings in the admin view and the offline notice. Not part of the look. */
+  --warn: #ffc46b;
+  --radius: 4px;
+  --radius-panel: 6px;
+  --display: Poppins, system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
+  --font: Poppins, system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
+  color-scheme: dark;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  min-height: 100dvh;
+  background-color: var(--stage);
+  /* The spotlight: a purple glow from the top of the page, scrolling with it. */
+  background-image: radial-gradient(120% 520px at 50% 0%, #3b0b74 0%, rgba(59, 11, 116, 0.35) 45%, rgba(var(--stage-rgb), 0) 75%);
+  background-repeat: no-repeat;
+  color: var(--white);
+  font-family: var(--font);
+  font-size: 16px;
+  line-height: 1.5;
+  -webkit-tap-highlight-color: transparent;
+}
+
+h1,
+h2,
+p,
+ul,
+ol {
+  margin: 0;
+}
+
+ul,
+ol {
+  padding: 0;
+  list-style: none;
+}
+
+a {
+  color: var(--lilac);
+}
+
+code {
+  padding: 2px 6px;
+  border-radius: var(--radius);
+  background: var(--card-2);
+  font-size: 0.9em;
+}
+
+strong {
+  font-weight: 700;
+}
+
+:focus-visible {
+  outline: 3px solid var(--lilac);
+  outline-offset: 3px;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* ---------- shared pieces ---------- */
+
+.demo-banner {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  justify-content: center;
+  padding: 8px 16px;
+  background: var(--lilac);
+  color: var(--stage);
+  font-size: 0.8125rem;
+  text-align: center;
+}
+
+.demo-banner strong {
+  letter-spacing: 0.12em;
+}
+
+.brand {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 8px;
+  align-items: baseline;
+  color: var(--lilac);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.2em;
+  line-height: 1.4;
+  text-transform: uppercase;
+}
+
+.brand__mark {
+  color: var(--white);
+  font-weight: 700;
+}
+
+.brand__sep {
+  opacity: 0.6;
+}
+
+.pill {
+  display: inline-flex;
+  flex: none;
+  gap: 7px;
+  align-items: center;
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: rgba(28, 11, 71, 0.8);
+  color: var(--muted);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.pill__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.pill--open {
+  border-color: rgba(183, 148, 255, 0.55);
+  color: var(--lilac);
+}
+
+.pill--closed {
+  border-color: rgba(255, 107, 129, 0.5);
+  color: var(--danger);
+}
+
+.button {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  padding: 12px 20px;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: var(--purple);
+  color: #fff;
+  font-family: var(--display);
+  font-size: 0.9375rem;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: 0.04em;
+  text-decoration: none;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition:
+    transform 0.12s ease,
+    background 0.12s ease;
+}
+
+.button:hover:not(:disabled) {
+  background: var(--purple-hover);
+}
+
+.button:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.button--wide {
+  width: 100%;
+}
+
+/* The vote action. The one place, with the selected card, that lime is used. */
+.button--vote {
+  background: var(--lime);
+  color: var(--stage);
+}
+
+.button--vote:hover:not(:disabled) {
+  background: #e4ff75;
+}
+
+.button--ghost {
+  border-color: var(--line);
+  background: transparent;
+  color: var(--white);
+}
+
+.button--ghost:hover:not(:disabled) {
+  background: var(--card-2);
+}
+
+.button--danger {
+  background: #c2334d;
+}
+
+.button--danger:hover:not(:disabled) {
+  background: #d9435e;
+}
+
+.spinner {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  align-items: center;
+  padding: 64px 0;
+  color: var(--muted);
+}
+
+.spinner__ring {
+  width: 40px;
+  height: 40px;
+  border: 4px solid var(--line);
+  border-top-color: var(--lilac);
+  border-radius: 50%;
+  animation: spin 0.9s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.message {
+  margin-top: 32px;
+  padding: 24px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-panel);
+  background: var(--card);
+}
+
+.message--warn {
+  border-color: rgba(255, 196, 107, 0.45);
+}
+
+.message h2 {
+  font-family: var(--display);
+  font-size: 1.3125rem;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.message__body {
+  margin-top: 12px;
+  color: var(--muted);
+}
+
+.message__action {
+  margin-top: 20px;
+}
+
+.offline,
+.notice {
+  margin-top: 16px;
+  padding: 10px 14px;
+  border-radius: var(--radius);
+  background: rgba(255, 196, 107, 0.12);
+  color: var(--warn);
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.notice--good {
+  background: rgba(183, 148, 255, 0.14);
+  color: var(--lilac);
+}
+
+.hint {
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+.hint--warn {
+  color: var(--warn);
+}
+
+.error {
+  color: var(--danger);
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.text-button {
+  display: inline-block;
+  min-height: 44px;
+  margin-top: 6px;
+  padding: 10px 0;
+  border: 0;
+  background: none;
+  color: var(--lilac);
+  font: inherit;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  text-align: left;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+/* ---------- voter ---------- */
+
+.voter,
+.admin {
+  width: 100%;
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 16px 16px calc(40px + env(safe-area-inset-bottom));
+}
+
+.admin {
+  max-width: 760px;
+}
+
+.voter__top,
+.admin__top {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* ---------- key visual banner ---------- */
+
+/*
+ * Fixed aspect ratio, so the page does not jump while the image loads.
+ * 16:9 everywhere, or 3:1 from 900px when a separate desktop image is set.
+ * The contestant-photo treatment is NOT applied here: the key visual is shown as supplied.
+ */
+.key-visual {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  margin: 0 0 16px;
+  overflow: hidden;
+  border-radius: var(--radius);
+  background: var(--card);
+}
+
+.key-visual picture,
+.key-visual__img {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.key-visual__img {
+  object-fit: cover;
+}
+
+/*
+ * KEY VISUAL BAND (Revision 8). The key visual's background is a left-to-right
+ * gradient (dark indigo to violet) that is the same from top to bottom. The page
+ * continues it: the band behind and beside the banner carries the same colour
+ * stops, lined up with the banner's left and right edges, so the banner has no
+ * visible edge against the page. Below the banner the band fades into --stage.
+ *
+ * Stops sampled from the supplied PNGs (top and bottom 24px rows, median, every
+ * 10%; LED dots smoothed out). A new creative needs them re-sampled.
+ *
+ * How it reaches the screen edges without widening the page: border-image with
+ * a 100vw outset paints outside the box, which is not scrollable overflow. In
+ * the image area the banner runs from 100vw to (100% - 100vw).
+ * z-index -1 with no stacking context in between: it paints above the page
+ * background and below all content.
+ */
+.kv-band {
+  --kv-x: 100vw;
+  --kv-w: (100% - 200vw);
+  --kv-fade: 112px;
+  /* Phone image, 1080 x 608: used below 900px. */
+  --kv-0: #12003c;
+  --kv-10: #1b0048;
+  --kv-20: #200150;
+  --kv-30: #28045b;
+  --kv-40: #33076a;
+  --kv-50: #3b0b74;
+  --kv-60: #430f7f;
+  --kv-70: #4e138c;
+  --kv-80: #58179a;
+  --kv-90: #5f1ca3;
+  --kv-100: #6920af;
+  position: relative;
+  margin: 0 0 16px;
+}
+
+.kv-band > .key-visual {
+  margin: 0;
+}
+
+.kv-band::before,
+.kv-band::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  left: 0;
+  z-index: -1;
+  pointer-events: none;
+}
+
+.kv-band::before {
+  top: -64px;
+  bottom: calc(-1 * var(--kv-fade));
+  border-image: linear-gradient(
+      90deg,
+      var(--kv-0) var(--kv-x),
+      var(--kv-10) calc(var(--kv-x) + var(--kv-w) * 0.1),
+      var(--kv-20) calc(var(--kv-x) + var(--kv-w) * 0.2),
+      var(--kv-30) calc(var(--kv-x) + var(--kv-w) * 0.3),
+      var(--kv-40) calc(var(--kv-x) + var(--kv-w) * 0.4),
+      var(--kv-50) calc(var(--kv-x) + var(--kv-w) * 0.5),
+      var(--kv-60) calc(var(--kv-x) + var(--kv-w) * 0.6),
+      var(--kv-70) calc(var(--kv-x) + var(--kv-w) * 0.7),
+      var(--kv-80) calc(var(--kv-x) + var(--kv-w) * 0.8),
+      var(--kv-90) calc(var(--kv-x) + var(--kv-w) * 0.9),
+      var(--kv-100) calc(var(--kv-x) + var(--kv-w))
+    )
+    fill 0 / 0 / 0 100vw;
+}
+
+/* The fade, laid over the lower part of the band: transparent at the banner's bottom edge, --stage below. */
+.kv-band::after {
+  top: 100%;
+  height: var(--kv-fade);
+  border-image: linear-gradient(180deg, rgba(var(--stage-rgb), 0) 0%, rgba(var(--stage-rgb), 0.72) 45%, var(--stage) 100%) fill 0 / 0 / 0 100vw;
+}
+
+/* The band replaces the spotlight glow on the voting page. */
+body:has(.kv-band) {
+  background-image: none;
+}
+
+/* Demo build only: shows where the creative goes and how much room it takes. */
+.key-visual--placeholder {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  border: 2px dashed rgba(183, 148, 255, 0.6);
+  background: repeating-linear-gradient(135deg, rgba(123, 63, 228, 0.12) 0 12px, rgba(123, 63, 228, 0.04) 12px 24px);
+  color: var(--muted);
+  font-size: 0.75rem;
+  line-height: 1.35;
+  text-align: center;
+}
+
+.key-visual--placeholder strong {
+  color: var(--lilac);
+  font-family: var(--display);
+  font-size: 1.0625rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+/* ---------- promo banner (Revision 7) ---------- */
+
+/*
+ * An image and optionally a link, nothing else. Fixed 3:1 (16:9 below 640px
+ * when a phone image is set) so nothing jumps while it loads. Shown as
+ * supplied: no photo treatment.
+ */
+.promo-banner {
+  position: relative;
+  display: block;
+  aspect-ratio: 3 / 1;
+  margin: 20px 0 0;
+  overflow: hidden;
+  border-radius: var(--radius);
+  background: var(--card);
+}
+
+.voter__save + .promo-banner,
+.promo-banner[data-placement='after-vote'] {
+  margin: 16px 0 0;
+}
+
+.promo-banner picture,
+.promo-banner__img {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.promo-banner__img {
+  object-fit: cover;
+}
+
+a.promo-banner:focus-visible {
+  outline: 3px solid var(--lilac);
+  outline-offset: 3px;
+}
+
+@media (max-width: 639px) {
+  .promo-banner--has-phone {
+    aspect-ratio: 16 / 9;
+  }
+}
+
+/* ---------- headline ---------- */
+
+.voter__intro {
+  margin-top: 18px;
+}
+
+.voter__intro h1,
+.admin h1 {
+  font-family: var(--display);
+  font-size: clamp(1.875rem, 8.4vw, 3rem);
+  font-weight: 800;
+  line-height: 1.05;
+  letter-spacing: -0.01em;
+  text-transform: uppercase;
+  text-wrap: balance;
+}
+
+.admin h1 {
+  margin-top: 20px;
+  font-size: clamp(1.75rem, 7vw, 2.5rem);
+}
+
+.voter__lede {
+  margin-top: 12px;
+  color: var(--muted);
+  font-size: 1rem;
+  text-wrap: pretty;
+}
+
+.voter__save {
+  min-height: 0;
+  margin-top: 16px;
+  border-radius: var(--radius);
+  font-size: 0.9375rem;
+  font-weight: 500;
+}
+
+.voter__save:empty {
+  display: none;
+}
+
+/* Focused only so screen readers announce it; it is not a control, so no ring. */
+.voter__save:focus,
+.voter__save:focus-visible {
+  outline: none;
+}
+
+.voter__save--sending,
+.voter__save--counted,
+.voter__save--failed {
+  padding: 12px 14px;
+  border-left: 3px solid currentColor;
+}
+
+.voter__save--sending {
+  background: var(--card-2);
+  color: var(--muted);
+}
+
+.voter__save--counted {
+  background: rgba(183, 148, 255, 0.14);
+  color: var(--lilac);
+}
+
+.voter__save--failed {
+  margin-bottom: 12px;
+  background: rgba(255, 107, 129, 0.12);
+  color: #ffb3bf;
+}
+
+/* ---------- contestant grid ---------- */
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.card {
+  position: relative;
+  aspect-ratio: 4 / 5;
+  border-radius: var(--radius);
+  background: var(--card);
+  /* The numeral is sized from the card's width (cqw), where supported. */
+  container-type: inline-size;
+}
+
+/*
+ * The card clips its contents, so the focus ring is drawn on the card itself.
+ * Keyboard focus only where the browser can tell (:has); any focus otherwise.
+ */
+.card:focus-within {
+  outline: 3px solid var(--lilac);
+  outline-offset: 3px;
+}
+
+@supports selector(:has(*)) {
+  .card:focus-within {
+    outline: none;
+  }
+
+  .card:has(.card__face:focus-visible) {
+    outline: 3px solid var(--lilac);
+    outline-offset: 3px;
+  }
+}
+
+.card--chosen {
+  box-shadow: 0 0 0 3px var(--lime);
+}
+
+.card__face {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: var(--radius);
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.card__face:focus-visible {
+  outline: none;
+}
+
+.card__face:disabled {
+  cursor: default;
+}
+
+.card__face:active:not(:disabled) {
+  transform: scale(0.985);
+}
+
+/*
+ * THE PHOTO TREATMENT, for contestant photos and placeholders alike. A true
+ * duotone, so it holds at the extremes (a blown-out white photo, a near-black one):
+ *   1. the image goes high-contrast mono (filter);
+ *   2. a lilac-to-purple layer in `multiply` tones it: white becomes lilac (::before);
+ *   3. a deep purple layer in `screen` lifts the blacks to purple (::after).
+ * isolation keeps both blends inside the image box. The black fade that carries
+ * the name is drawn on the card face, above the image (.card__face::after).
+ */
+.card__art,
+.sheet__art {
+  position: absolute;
+  inset: 0;
+  display: block;
+  overflow: hidden;
+  background: var(--card);
+  isolation: isolate;
+}
+
+.card__art .art,
+.sheet__art .art {
+  filter: grayscale(1) contrast(1.25);
+}
+
+.card__art::before,
+.sheet__art::before,
+.card__art::after,
+.sheet__art::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.card__art::before,
+.sheet__art::before {
+  background: linear-gradient(135deg, #c7a6ff 0%, #9b67f2 55%, #7b3fe4 100%);
+  mix-blend-mode: multiply;
+}
+
+.card__art::after,
+.sheet__art::after {
+  /* Revision 8: blacks lift to the key visual's purples (was #2A1466 to #160B33). */
+  background: linear-gradient(135deg, #33076a 0%, #1c0048 100%);
+  mix-blend-mode: screen;
+}
+
+/* Solid enough behind the name that a white photo still leaves it readable. */
+.card__face::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  background: linear-gradient(0deg, rgba(var(--stage-rgb), 0.96) 0%, rgba(var(--stage-rgb), 0.88) 24%, rgba(var(--stage-rgb), 0) 62%);
+  pointer-events: none;
+}
+
+.art {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Giant outlined numeral, top right. Decorative: aria-hidden in the markup. */
+.card__numeral {
+  position: absolute;
+  top: -0.1em;
+  right: -0.04em;
+  z-index: 3;
+  color: transparent;
+  font-family: var(--display);
+  font-size: 80px;
+  font-size: 46cqw;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.04em;
+  -webkit-text-stroke: 1.5px rgba(183, 148, 255, 0.8);
+  pointer-events: none;
+  user-select: none;
+}
+
+.card--chosen .card__numeral {
+  -webkit-text-stroke-color: var(--lime);
+}
+
+.card__badge {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 4;
+  padding: 5px 8px 4px;
+  border-radius: var(--radius);
+  background: var(--lime);
+  color: var(--stage);
+  font-family: var(--display);
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.card__caption {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  left: 10px;
+  z-index: 4;
+  display: grid;
+  gap: 5px;
+}
+
+.card__stage {
+  font-family: var(--display);
+  font-size: 0.9375rem;
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: 0;
+  text-transform: uppercase;
+  overflow-wrap: anywhere;
+  text-shadow: 0 1px 10px rgba(var(--stage-rgb), 0.8);
+}
+
+.card__label,
+.card__count {
+  color: var(--lilac);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  line-height: 1.3;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  overflow-wrap: anywhere;
+}
+
+.card__count {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- confirm sheet ---------- */
+
+.sheet {
+  width: min(100% - 32px, 440px);
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-panel);
+  background: var(--card);
+  color: var(--white);
+}
+
+.sheet::backdrop {
+  background: rgba(8, 0, 28, 0.8);
+}
+
+/* Browsers without dialog.showModal(): centre it by hand and draw the backdrop as a shadow. */
+.sheet--fallback[open] {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  z-index: 30;
+  display: block;
+  margin: 0;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 0 0 100vmax rgba(8, 0, 28, 0.8);
+}
+
+.sheet__body {
+  padding: 24px;
+  text-align: center;
+}
+
+.sheet__art {
+  position: relative;
+  inset: auto;
+  width: 112px;
+  height: 140px;
+  margin: 0 auto 16px;
+  border-radius: var(--radius);
+}
+
+.sheet h2 {
+  font-family: var(--display);
+  font-size: 1.375rem;
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: -0.005em;
+  text-transform: uppercase;
+  text-wrap: balance;
+}
+
+.sheet p {
+  margin-top: 10px;
+  color: var(--muted);
+  text-wrap: pretty;
+}
+
+.sheet__actions {
+  display: grid;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+/*
+ * Phones: dock the sheet to the bottom of the VISIBLE screen, which is the part
+ * above the on-screen keyboard once the email field has focus. --vv-top and
+ * --vv-height come from useVisibleArea() in ui/common.tsx; without them (older
+ * browsers) the sheet sits at the bottom of the page instead.
+ */
+@media (max-width: 599px) {
+  .sheet[open],
+  .sheet--fallback[open] {
+    position: fixed;
+    top: calc(var(--vv-top, 0px) + var(--vv-height, 100dvh));
+    bottom: auto;
+    left: 0;
+    right: 0;
+    width: 100%;
+    max-width: none;
+    max-height: calc(var(--vv-height, 100dvh) - 12px);
+    margin: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    border-width: 1px 0 0;
+    border-radius: var(--radius-panel) var(--radius-panel) 0 0;
+    transform: translateY(-100%);
+  }
+
+  .sheet__body {
+    padding: 20px 16px calc(16px + env(safe-area-inset-bottom));
+  }
+
+  .sheet__art {
+    width: 80px;
+    height: 100px;
+    margin-bottom: 12px;
+  }
+
+  .sheet h2 {
+    font-size: 1.25rem;
+  }
+}
+
+/* Keyboard up on a short screen: drop the picture and tighten, so both buttons fit. */
+:root[data-vv-short] .sheet__art {
+  display: none;
+}
+
+:root[data-vv-short] .sheet__body {
+  padding-top: 16px;
+  padding-bottom: 12px;
+}
+
+:root[data-vv-short] .sheet .field {
+  margin-top: 12px;
+}
+
+:root[data-vv-short] .sheet__actions {
+  gap: 8px;
+  margin-top: 14px;
+}
+
+:root[data-vv-short] .sheet .button {
+  min-height: 44px;
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+
+.field {
+  display: grid;
+  gap: 6px;
+  margin-top: 16px;
+  text-align: left;
+}
+
+.field label {
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+/* 16px minimum: iOS Safari zooms the whole page into any smaller input on focus. */
+.field input {
+  width: 100%;
+  min-height: 48px;
+  padding: 10px 14px;
+  border: 2px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--stage);
+  color: var(--white);
+  font: inherit;
+  font-size: 16px;
+}
+
+.field input::placeholder {
+  color: var(--faint);
+}
+
+.field input:focus {
+  border-color: var(--lilac);
+  outline: none;
+}
+
+.field input[aria-invalid='true'] {
+  border-color: var(--danger);
+}
+
+.sheet .field__error {
+  margin-top: 0;
+  color: #ffb3bf;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+/* ---------- admin ---------- */
+
+.panel {
+  margin-top: 20px;
+  padding: 20px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-panel);
+  background: var(--card);
+}
+
+.panel--demo {
+  border-style: dashed;
+  border-color: rgba(183, 148, 255, 0.5);
+}
+
+/* The audit export: set apart from the publishable exports so the two cannot be confused. */
+.panel--confidential {
+  border: 2px solid rgba(255, 107, 129, 0.55);
+  background: linear-gradient(0deg, rgba(255, 107, 129, 0.06), rgba(255, 107, 129, 0.06)), var(--card);
+}
+
+.panel--confidential h2 {
+  color: #ffb3bf;
+}
+
+.panel__head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.panel h2 {
+  font-family: var(--display);
+  font-size: 1.0625rem;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.panel__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.panel__actions--tight {
+  margin-top: 8px;
+}
+
+.panel__actions + .hint {
+  margin-top: 14px;
+}
+
+.panel > .hint + .hint,
+.panel > table + .hint,
+.panel > ul + .hint {
+  margin-top: 12px;
+}
+
+.button--selected {
+  border-color: var(--lilac);
+  color: var(--lilac);
+}
+
+.demo-email {
+  color: var(--lilac);
+  overflow-wrap: anywhere;
+}
+
+.demo-row {
+  margin-top: 16px;
+}
+
+.panel--demo .notice {
+  margin-top: 14px;
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px 20px;
+  margin: 0 0 14px;
+}
+
+.facts dt {
+  color: var(--muted);
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.facts dd {
+  margin: 2px 0 0;
+  font-weight: 700;
+}
+
+/* Status, so it never relies on colour alone: an icon and words carry it too. */
+.flag {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 196, 107, 0.4);
+  border-radius: var(--radius);
+  background: rgba(255, 196, 107, 0.08);
+  font-size: 0.9375rem;
+}
+
+.flag__icon {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--warn);
+  color: var(--stage);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  line-height: 20px;
+  text-align: center;
+}
+
+.flags {
+  display: grid;
+}
+
+.gate {
+  display: grid;
+  gap: 12px;
+}
+
+.gate label {
+  font-weight: 500;
+}
+
+.gate input {
+  min-height: 48px;
+  padding: 10px 14px;
+  border: 2px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--stage);
+  color: var(--white);
+  font: inherit;
+  font-size: 16px;
+}
+
+.stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+  align-items: baseline;
+  color: var(--muted);
+}
+
+.stats strong {
+  color: var(--white);
+  font-family: var(--display);
+  font-size: 1.5rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.preview {
+  width: 100%;
+  margin-top: 12px;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.preview th,
+.preview td {
+  padding: 8px 4px;
+  border-bottom: 1px solid var(--line-soft);
+  text-align: left;
+}
+
+.preview th {
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.preview .preview__num {
+  text-align: right;
+}
+
+.ranking__bar-head,
+.ranking__bar-cell {
+  width: 38%;
+}
+
+.ranking__bar {
+  display: block;
+  height: 12px;
+}
+
+/* A bar grows from the left edge: square at the baseline, rounded at the data end. */
+.ranking__fill {
+  display: block;
+  height: 100%;
+  min-width: 0;
+  border-radius: 0 3px 3px 0;
+  background: var(--purple);
+  transition: width 0.4s ease;
+}
+
+.ranking__row--out td {
+  color: var(--muted);
+}
+
+.ranking__row--out .ranking__fill {
+  background: #4b3d6e;
+}
+
+.preview .ranking__row--cut td {
+  border-bottom: 2px solid var(--lilac);
+}
+
+.ranking__note {
+  color: var(--muted);
+  font-size: 0.8125rem;
+}
+
+/* ---------- chart ---------- */
+
+.chart {
+  margin: 0;
+}
+
+.chart__plot {
+  position: relative;
+}
+
+.chart svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.chart__grid {
+  stroke: var(--line);
+  stroke-width: 1;
+}
+
+.chart__tick {
+  fill: var(--muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.chart__value {
+  fill: var(--white);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.chart__column {
+  fill: var(--purple);
+}
+
+.chart__column--active {
+  fill: var(--lilac);
+}
+
+.chart__hit {
+  fill: transparent;
+}
+
+.chart__tooltip {
+  position: absolute;
+  z-index: 5;
+  display: grid;
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--stage);
+  font-size: 0.8125rem;
+  white-space: nowrap;
+  pointer-events: none;
+  transform: translate(-50%, calc(-100% - 10px));
+}
+
+.chart__tooltip span {
+  color: var(--muted);
+}
+
+.chart__table {
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+.chart__table summary {
+  cursor: pointer;
+}
+
+@media (max-width: 520px) {
+  .ranking__bar-head,
+  .ranking__bar-cell {
+    display: none;
+  }
+}
+
+/*
+ * Wider screens: the same page, given room. Three then four contestants a row
+ * (as established in Revision 3). The intro keeps a readable line length.
+ */
+@media (min-width: 640px) {
+  .voter {
+    max-width: 720px;
+    padding-top: 24px;
+  }
+
+  .voter__intro {
+    max-width: 600px;
+  }
+
+  .grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px;
+  }
+}
+
+@media (min-width: 900px) {
+  .voter {
+    max-width: 960px;
+    padding-top: 32px;
+  }
+
+  /* Desktop image, 1920 x 640: used from 900px. */
+  .kv-band--desktop {
+    --kv-fade: 160px;
+    --kv-0: #000026;
+    --kv-10: #030033;
+    --kv-20: #09003e;
+    --kv-30: #14004b;
+    --kv-40: #1d0057;
+    --kv-50: #280065;
+    --kv-60: #330472;
+    --kv-70: #3d097f;
+    --kv-80: #490e8d;
+    --kv-90: #54149a;
+    --kv-100: #5f1aa7;
+  }
+
+  /* The demo placeholder takes the desktop shape too, so a laptop shows the room a desktop creative will take. */
+  .key-visual--has-desktop,
+  .key-visual--placeholder {
+    aspect-ratio: 3 / 1;
+  }
+
+  .voter__intro {
+    margin-top: 28px;
+  }
+
+  .grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 20px;
+    margin-top: 28px;
+  }
+
+  .card__stage {
+    font-size: 1.0625rem;
+  }
+
+  .voter .panel--demo {
+    max-width: 720px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .card__face:active:not(:disabled),
+  .button:active:not(:disabled) {
+    transform: none;
+  }
+}

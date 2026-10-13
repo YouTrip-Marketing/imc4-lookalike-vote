@@ -1,0 +1,41 @@
+{
+  "name": "imc4-lookalike-voting",
+  "private": true,
+  "version": "0.2.0",
+  "description": "Public online voting site for the IMC 4 lookalike contest, Top 20 to Top 10. First draft, local build only.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "build:edge": "tsx scripts/build-edge-function.ts",
+    "check:deploy": "tsx scripts/check-deploy.ts",
+    "deploy": "npm run check:deploy && npm run build && gh-pages -d dist",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "tsx scripts/e2e-smoke.ts",
+    "api:local": "tsx scripts/local-api-server.ts",
+    "seed:sql": "tsx scripts/generate-seed-sql.ts",
+    "secrets": "tsx scripts/generate-secrets.ts"
+  },
+  "dependencies": {
+    "@fontsource/poppins": "^5.3.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.3.0",
+    "@types/node": "^22.7.0",
+    "@types/react": "^18.3.11",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.2",
+    "esbuild": "^0.28.0",
+    "gh-pages": "^6.3.0",
+    "puppeteer-core": "^24.0.0",
+    "tsx": "^4.19.1",
+    "typescript": "^5.6.2",
+    "vite": "^5.4.8",
+    "vitest": "^2.1.2"
+  }
+}

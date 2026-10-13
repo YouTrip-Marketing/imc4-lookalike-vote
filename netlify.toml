@@ -1,0 +1,23 @@
+# Netlify settings. NOT DEPLOYED. This is the ALTERNATIVE deployment: the primary
+# path is GitHub Pages + Supabase (see README).
+#
+# The site is static files plus one function (netlify/functions/api.ts), which
+# Netlify serves at /api/* on the same domain as the page.
+
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  VITE_STORAGE_ADAPTER = "api"
+  VITE_API_BASE_URL = "/api"
+
+[functions]
+  directory = "netlify/functions"
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "no-referrer"
+    X-Frame-Options = "DENY"
