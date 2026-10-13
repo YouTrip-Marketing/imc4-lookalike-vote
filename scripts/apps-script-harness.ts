@@ -74,7 +74,10 @@ export interface AppsScriptRun {
   call(name: string, ...args: unknown[]): unknown;
 }
 
-export function loadAppsScript(options: { now?: () => Date } = {}): AppsScriptRun {
+/** The real sheet's ID, as set in Code.gs. */
+export const TEST_SHEET_ID = '1nq_hyBZWk5zbTLuigdTyThQLf94mxaSr_Z3IklOcGEE';
+
+export function loadAppsScript(options: { now?: () => Date; sheetId?: string } = {}): AppsScriptRun {
   const tabs = new Map<string, FakeSheet>();
   let lockHeld = false;
   const RealDate = Date;
@@ -90,6 +93,7 @@ export function loadAppsScript(options: { now?: () => Date } = {}): AppsScriptRu
   const services = {
     SpreadsheetApp: {
       getActiveSpreadsheet: () => ({
+        getId: () => options.sheetId ?? TEST_SHEET_ID,
         getSheetByName: (name: string) => tabs.get(name) ?? null,
         insertSheet: (name: string) => {
           const sheet = new FakeSheet();

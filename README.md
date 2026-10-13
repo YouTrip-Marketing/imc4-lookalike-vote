@@ -748,9 +748,25 @@ a `sheet` build, and any build that still has `VITE_SHEET_ENDPOINT` set.
 | Build settings | `.env.sheet-test.example`, copy to `.env.sheet-test` |
 | Tests | `tests/apps-script.test.ts`, `tests/sheet-store.test.ts`, e2e Part C |
 
-**What lands in the sheet.** Tab `Votes`, one row per vote: Time (SGT), No.,
-Contestant, Email (as typed), Email (counted as), Device (e.g. "iPhone ·
-Instagram"), Vote ID. Tab `Tally`: one COUNTIF per contestant and a total.
+**The sheet.** "Jkook lookalike contest voting site",
+[`1nq_hyBZWk5zbTLuigdTyThQLf94mxaSr_Z3IklOcGEE`](https://docs.google.com/spreadsheets/d/1nq_hyBZWk5zbTLuigdTyThQLf94mxaSr_Z3IklOcGEE).
+The ID is `SHEET_ID` in `Code.gs`: pasted into any other spreadsheet, the script
+refuses to write.
+
+**What lands in it.** Tab `Votes`, one row per attempt: Timestamp (SGT),
+Email (as typed), Canonical email, IP (self-reported), Contestant no.,
+Contestant name, Vote ID, User agent (short, e.g. "iPhone · Instagram"),
+Duplicate?. A repeat from an email that has already voted is refused on the page
+but still gets a row with Duplicate? = TRUE (shaded red), so the rule can be seen
+working. Tab `Tally`: COUNTIFS per contestant over rows with Duplicate? = FALSE,
+a total, and a count of refused repeats.
+
+**IP (self-reported) is indicative only.** Apps Script never sees the caller's
+IP address. So the page asks a public lookup service (api.ipify.org, 2.5 s
+timeout, `unavailable` if it fails or is blocked) for its own public IP and sends
+it with the vote. Anyone can send any value, so it is forgeable and proves
+nothing. It is never used to accept or refuse a vote. The production Supabase
+API records the real address on the server, in the confidential audit table.
 
 **Rules the script enforces.** One vote per email, using the site's rule
 (Gmail dots and `+tag` folded; others as typed). A script lock makes the check
@@ -760,15 +776,15 @@ as formulas. Voting is always open on the test site; the window is shown, not
 enforced. Open/Close in `#/admin` do nothing here, and the audit export points
 to the sheet.
 
-**Privacy.** The sheet holds readable emails. That is fine for internal testing
-only. Legal's position (emails only in the confidential export) applies to
-production.
+**Privacy.** The sheet holds readable emails and IPs. That is fine for internal
+testing only. Legal's position (emails only in the confidential export) applies
+to production.
 
 ### Deploying the receiver (Kelicia, in the browser, once)
 
 Google needs the sheet owner's own authorisation, so nobody else can do this step.
 
-1. Open the sheet. Menu **Extensions > Apps Script**. A new tab opens with `Code.gs`.
+1. Open [the sheet](https://docs.google.com/spreadsheets/d/1nq_hyBZWk5zbTLuigdTyThQLf94mxaSr_Z3IklOcGEE). Menu **Extensions > Apps Script**. A new tab opens with `Code.gs`.
 2. Select everything in `Code.gs` and delete it. Paste the whole of `apps-script/Code.gs`. Click the **Save** (disk) icon.
 3. Top right, blue **Deploy** button > **New deployment**.
 4. Next to "Select type", click the **gear** icon > **Web app**.

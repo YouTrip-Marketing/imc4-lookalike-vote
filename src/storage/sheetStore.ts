@@ -29,7 +29,15 @@ import type { VoteStore } from './VoteStore';
  *
  * Requests go as text/plain so the browser sends them without a CORS
  * preflight, which Apps Script web apps cannot answer.
+ *
+ * IP (self-reported): Apps Script never sees the voter's IP address, so the
+ * page asks a public lookup service for its own and sends that with the vote.
+ * INDICATIVE ONLY and forgeable. It is never used to accept or refuse a vote.
+ * The production API records the real address on the server.
  */
+
+/** Public "what is my IP" service. Answers {"ip":"..."} with CORS open. */
+export const DEFAULT_IP_LOOKUP_URL = 'https://api.ipify.org?format=json';
 
 export interface SheetStoreOptions {
   /** The web app's /exec address. */
@@ -43,7 +51,12 @@ export interface SheetStoreOptions {
   now?: () => Date;
   /** The browser's user agent, shortened to a device label for the sheet. */
   userAgent?: string;
+  /** Where the page looks up its own public IP. Omit to skip the lookup ('unavailable'). */
+  ipLookupUrl?: string;
+  ipTimeoutMs?: number;
 }
+
+const IP_PATTERN = /^[0-9A-Fa-f:.]{3,45}$/;
 
 /** What the Votes tab's GET answer holds for one vote. No email. */
 interface SheetVote {
@@ -104,6 +117,7 @@ export class SheetVoteStore implements VoteStore {
   private readonly device: string;
   private readonly byId: Map<ContestantId, Pick<Contestant, 'id' | 'number' | 'stageName'>>;
   private readonly byNumber: Map<number, ContestantId>;
+  private ipLookup: Promise<string> | null = null;
 
   constructor(private readonly options: SheetStoreOptions) {
     const endpoint = options.endpoint.trim();
@@ -121,6 +135,40 @@ export class SheetVoteStore implements VoteStore {
     this.device = deviceLabel(options.userAgent ?? '');
     this.byId = new Map(options.contestants.map((c) => [c.id, c]));
     this.byNumber = new Map(options.contestants.map((c) => [c.number, c.id]));
+  }
+
+  /**
+   * The page's public IP as a lookup service sees it, or 'unavailable'. Looked
+   * up once and kept for the page visit. Never throws, and gives up after
+   * ipTimeoutMs (2.5 s) so a slow lookup cannot hold up a vote for long.
+   */
+  lookupIp(): Promise<string> {
+    if (this.ipLookup !== null) return this.ipLookup;
+    const url = this.options.ipLookupUrl;
+    if (url === undefined || !/^https:\/\/|^http:\/\/(localhost|127\.0\.0\.1)/.test(url)) {
+      this.ipLookup = Promise.resolve('unavailable');
+      return this.ipLookup;
+    }
+    this.ipLookup = (async () => {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), this.options.ipTimeoutMs ?? 2500);
+      try {
+        const response = await this.fetchImpl(url, {
+          signal: controller.signal,
+          cache: 'no-store',
+          credentials: 'omit',
+        });
+        const body = (await response.json()) as { ip?: unknown };
+        return typeof body.ip === 'string' && IP_PATTERN.test(body.ip.trim()) && /[.:]/.test(body.ip)
+          ? body.ip.trim()
+          : 'unavailable';
+      } catch {
+        return 'unavailable';
+      } finally {
+        clearTimeout(timer);
+      }
+    })();
+    return this.ipLookup;
   }
 
   private state(): EventState {
@@ -212,6 +260,7 @@ export class SheetVoteStore implements VoteStore {
     if (contestant === undefined) throw new VoteError('invalid_vote');
     if (canonicalEmail(email) === null) throw new VoteError('invalid_email');
 
+    const ip = await this.lookupIp();
     const data = await this.request({
       method: 'POST',
       // text/plain: a "simple" request, so no preflight (see the class comment).
@@ -222,6 +271,7 @@ export class SheetVoteStore implements VoteStore {
         email: email.trim(),
         voteId: requestId,
         device: this.device,
+        ip,
       }),
     });
     const answer = (typeof data === 'object' && data !== null ? data : {}) as {
@@ -267,13 +317,17 @@ export class SheetVoteStore implements VoteStore {
 }
 
 /** Wires the sheet store to event.config.ts. */
-export function createSheetStore(endpoint: string): SheetVoteStore {
-  return new SheetVoteStore({
+export function createSheetStore(endpoint: string, ipLookupUrl?: string): SheetVoteStore {
+  const store = new SheetVoteStore({
     endpoint,
     contestants: configuredContestants,
     window: votingWindow,
     rules: votingRules,
     passcode: demo.passcode,
     userAgent: typeof navigator === 'undefined' ? '' : navigator.userAgent,
+    ipLookupUrl: ipLookupUrl === undefined || ipLookupUrl.trim() === '' ? DEFAULT_IP_LOOKUP_URL : ipLookupUrl.trim(),
   });
+  // Start the lookup while the page loads, so it is ready by the time someone votes.
+  void store.lookupIp();
+  return store;
 }

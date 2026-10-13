@@ -79,8 +79,11 @@ describe('the sheet store (test site)', () => {
       email: 'Test+1@Example.com',
       voteId: 'req-0001-aaaa',
       device: 'iPhone · Instagram',
+      ip: 'unavailable',
     });
-    expect(script.votes()?.rows[1]?.slice(1, 6)).toEqual([7, 'Contestant 7', 'Test+1@Example.com', 'test+1@example.com', 'iPhone · Instagram']);
+    expect(script.votes()?.rows[1]?.slice(1, 9)).toEqual([
+      'Test+1@Example.com', 'test+1@example.com', 'unavailable', 7, 'Contestant 7', 'req-0001-aaaa', 'iPhone · Instagram', false,
+    ]);
   });
 
   it('reports a second vote from the same email as duplicate_vote', async () => {
@@ -146,6 +149,54 @@ describe('the sheet store (test site)', () => {
     const session = await sheet.getSession();
     expect(session.tallies?.find((t) => t.contestantId === 'c07')?.votes).toBe(1);
     expect(session.tallies).toHaveLength(contestants.length);
+  });
+});
+
+describe('the self-reported IP (indicative only)', () => {
+  const LOOKUP = 'https://api.ipify.org?format=json';
+
+  it('looks the IP up once, sends it with the vote, and the sheet records it', async () => {
+    const script = loadAppsScript();
+    const sheetFetch = fetchInto(script);
+    const fetch = vi.fn(async (url: string | URL | Request, init?: RequestInit) =>
+      String(url) === LOOKUP ? new Response(JSON.stringify({ ip: '203.0.113.5' })) : sheetFetch(url, init),
+    );
+    const sheet = store({ fetch, ipLookupUrl: LOOKUP });
+    await sheet.castVote('c07', 'a@example.com', 'req-0001-aaaa');
+    await sheet.castVote('c08', 'b@example.com', 'req-0002-bbbb');
+    expect(fetch.mock.calls.filter(([url]) => String(url) === LOOKUP)).toHaveLength(1);
+    expect(script.votes()?.rows.slice(1).map((row) => row[3])).toEqual(['203.0.113.5', '203.0.113.5']);
+  });
+
+  it.each([
+    ['the lookup fails', async () => { throw new TypeError('blocked'); }],
+    ['the lookup answers nonsense', async () => new Response(JSON.stringify({ ip: '<script>' }))],
+    ['the lookup answers HTML', async () => new Response('<html></html>')],
+  ])('sends "unavailable" and still counts the vote when %s', async (_label, lookup) => {
+    const script = loadAppsScript();
+    const sheetFetch = fetchInto(script);
+    const fetch = vi.fn(async (url: string | URL | Request, init?: RequestInit) =>
+      String(url) === LOOKUP ? lookup() : sheetFetch(url, init),
+    );
+    const receipt = await store({ fetch, ipLookupUrl: LOOKUP }).castVote('c07', 'a@example.com', 'req-0001-aaaa');
+    expect(receipt.contestantId).toBe('c07');
+    expect(script.votes()?.rows[1]?.[3]).toBe('unavailable');
+  });
+
+  it('gives up on a slow lookup after the timeout', async () => {
+    const script = loadAppsScript();
+    const sheetFetch = fetchInto(script);
+    const fetch = vi.fn((url: string | URL | Request, init?: RequestInit) =>
+      String(url) === LOOKUP
+        ? new Promise<Response>((_resolve, reject) =>
+            init?.signal?.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError'))),
+          )
+        : sheetFetch(url, init),
+    );
+    const started = Date.now();
+    await store({ fetch, ipLookupUrl: LOOKUP, ipTimeoutMs: 50 }).castVote('c07', 'a@example.com', 'req-0001-aaaa');
+    expect(Date.now() - started).toBeLessThan(2000);
+    expect(script.votes()?.rows[1]?.[3]).toBe('unavailable');
   });
 });
 

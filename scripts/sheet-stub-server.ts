@@ -5,12 +5,15 @@
  *   - /exec answers with a 302 to a one-time address on another path, where the
  *     JSON waits (Apps Script redirects to script.googleusercontent.com);
  *   - every answer carries Access-Control-Allow-Origin: *;
+ *   - /ip stands in for the public IP lookup (api.ipify.org);
  *   - a CORS preflight (OPTIONS) is refused, as Apps Script cannot answer one,
  *     so a page that triggers a preflight fails here as it would for real.
  */
 import { randomUUID } from 'node:crypto';
 import { createServer, type Server } from 'node:http';
 import { loadAppsScript, type AppsScriptRun } from './apps-script-harness';
+
+export const STUB_IP = '203.0.113.5';
 
 export interface SheetStubServer {
   url: string;
@@ -29,6 +32,13 @@ export async function startSheetStubServer(port: number): Promise<SheetStubServe
     if (request.method === 'OPTIONS') {
       preflights += 1;
       response.writeHead(405).end();
+      return;
+    }
+    if (url.pathname === '/ip') {
+      // Stands in for api.ipify.org. A documentation-range address (RFC 5737).
+      response
+        .writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' })
+        .end(JSON.stringify({ ip: STUB_IP }));
       return;
     }
     if (url.pathname === '/echo') {

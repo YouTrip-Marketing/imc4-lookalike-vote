@@ -36,6 +36,7 @@ const vote = (overrides: Record<string, unknown> = {}): string =>
     email: 'test+1@example.com',
     voteId: 'vote-0001-aaaa',
     device: 'iPhone · Instagram',
+    ip: '203.0.113.5',
     ...overrides,
   });
 
@@ -58,25 +59,59 @@ describe('Code.gs doPost', () => {
     const sheet = script.votes();
     expect(sheet?.frozenRows).toBe(1);
     expect(sheet?.rows).toEqual([
-      ['Time (SGT)', 'No.', 'Contestant', 'Email (as typed)', 'Email (counted as)', 'Device', 'Vote ID'],
-      ['2026-10-13 14:30:00', 7, 'Contestant 7', 'test+1@example.com', 'test+1@example.com', 'iPhone · Instagram', 'vote-0001-aaaa'],
+      [
+        'Timestamp (SGT)', 'Email (as typed)', 'Canonical email', 'IP (self-reported)', 'Contestant no.',
+        'Contestant name', 'Vote ID', 'User agent (short)', 'Duplicate?',
+      ],
+      [
+        '2026-10-13 14:30:00', 'test+1@example.com', 'test+1@example.com', '203.0.113.5', 7,
+        'Contestant 7', 'vote-0001-aaaa', 'iPhone · Instagram', false,
+      ],
     ]);
   });
 
-  it('refuses a second vote from the same Gmail inbox spelled differently', () => {
+  it('refuses a second vote from the same Gmail inbox spelled differently, and logs it as Duplicate? TRUE', () => {
     const script = loadAppsScript();
     script.doPost(vote({ email: 'jane.doe@gmail.com', voteId: 'vote-0001-aaaa' }));
     const again = script.doPost(vote({ email: 'JaneDoe+again@googlemail.com', voteId: 'vote-0002-bbbb', contestantNumber: 3 }));
     expect(again.json).toEqual({ ok: true, data: { duplicate: true } });
-    expect(script.votes()?.rows).toHaveLength(2);
+    const rows = script.votes()?.rows ?? [];
+    expect(rows).toHaveLength(3);
+    expect(rows[2]?.slice(1, 5)).toEqual(['JaneDoe+again@googlemail.com', 'janedoe@gmail.com', '203.0.113.5', 3]);
+    expect(rows[2]?.[8]).toBe(true);
+    expect(rows[1]?.[8]).toBe(false);
   });
 
-  it('answers a retried vote id with the first answer and adds no row', () => {
+  it('answers a retried vote id with the first answer and adds no row, for counted and refused attempts', () => {
     const script = loadAppsScript({ now: () => new Date('2026-10-13T06:30:00Z') });
     const first = script.doPost(vote());
-    const retry = script.doPost(vote());
-    expect(retry.json).toEqual(first.json);
-    expect(script.votes()?.rows).toHaveLength(2);
+    expect(script.doPost(vote()).json).toEqual(first.json);
+    const refused = script.doPost(vote({ voteId: 'vote-0002-bbbb' }));
+    expect(script.doPost(vote({ voteId: 'vote-0002-bbbb' })).json).toEqual(refused.json);
+    expect(script.votes()?.rows).toHaveLength(3);
+  });
+
+  it('keeps a well-formed IP, and writes "unavailable" for anything else. Never refuses on IP', () => {
+    const script = loadAppsScript();
+    const ips = ['2001:db8::1', 'unavailable', '=1+1', '', 42, 'not an ip', '1234'];
+    ips.forEach((ip, index) => {
+      const answer = script.doPost(vote({ ip, email: `v${index}@example.com`, voteId: `vote-000${index}-ipip` }));
+      expect((answer.json as { data: { duplicate: boolean } }).data.duplicate).toBe(false);
+    });
+    expect(script.votes()?.rows.slice(1).map((row) => row[3])).toEqual([
+      '2001:db8::1', 'unavailable', 'unavailable', 'unavailable', 'unavailable', 'unavailable', 'unavailable',
+    ]);
+    // The same IP from two emails: both counted.
+    script.doPost(vote({ email: 'same-wifi-1@example.com', voteId: 'vote-1001-wifi' }));
+    script.doPost(vote({ email: 'same-wifi-2@example.com', voteId: 'vote-1002-wifi' }));
+    expect(script.votes()?.rows.slice(-2).map((row) => row[8])).toEqual([false, false]);
+  });
+
+  it('refuses to write when pasted into a different spreadsheet', () => {
+    const script = loadAppsScript({ sheetId: 'some-other-sheet' });
+    expect(script.doPost(vote()).json).toEqual({ ok: false, error: 'misconfigured' });
+    expect(script.doGet().json).toEqual({ ok: false, error: 'misconfigured' });
+    expect(script.votes()).toBeUndefined();
   });
 
   it('never writes a typed value as a formula', () => {
@@ -84,7 +119,7 @@ describe('Code.gs doPost', () => {
     script.doPost(vote({ email: '=hack@example.com', contestantName: '=IMPORTXML("x")', device: '+1' }));
     const sheet = script.votes();
     expect(sheet?.formulas).toEqual([]);
-    expect(sheet?.rows[1]?.[3]).toBe('=hack@example.com');
+    expect(sheet?.rows[1]?.[1]).toBe('=hack@example.com');
     // The duplicate check still sees the address through the apostrophe.
     expect(script.doPost(vote({ email: '=HACK@example.com', voteId: 'vote-0002-bbbb' })).json).toEqual({
       ok: true,
@@ -121,19 +156,21 @@ describe('Code.gs doPost', () => {
 });
 
 describe('Code.gs doGet', () => {
-  it('lists votes without any email', () => {
+  it('lists counted votes without any email or IP, leaving refused repeats out', () => {
     const script = loadAppsScript({ now: () => new Date('2026-10-13T06:30:00Z') });
     script.doPost(vote({ email: 'alice@example.com', voteId: 'vote-0001-aaaa' }));
+    script.doPost(vote({ email: 'alice@example.com', voteId: 'vote-0009-dupe', contestantNumber: 5 }));
     script.doPost(vote({ email: 'bob@example.com', voteId: 'vote-0002-bbbb', contestantNumber: 12 }));
     const answer = script.doGet().json as { ok: boolean; data: { votes: Record<string, unknown>[] } };
     expect(answer.ok).toBe(true);
     expect(answer.data.votes.map(({ n, no, at }) => ({ n, no, at }))).toEqual([
       { n: 1, no: 7, at: '2026-10-13T06:30:00.000Z' },
-      { n: 2, no: 12, at: '2026-10-13T06:30:00.000Z' },
+      // n follows the sheet's rows, so the refused repeat in between leaves a gap.
+      { n: 3, no: 12, at: '2026-10-13T06:30:00.000Z' },
     ]);
     for (const row of answer.data.votes) expect(row.ref).toMatch(/^[0-9a-f]{8}$/);
     expect(answer.data.votes[0]?.ref).not.toBe(answer.data.votes[1]?.ref);
-    expect(JSON.stringify(answer)).not.toMatch(/@/);
+    expect(JSON.stringify(answer)).not.toMatch(/@|203\.0\.113/);
   });
 
   it('answers an empty list before the first vote', () => {

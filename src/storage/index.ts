@@ -21,7 +21,7 @@ export async function createVoteStore(): Promise<VoteStore> {
   // TEST SITE only: votes go to a Google Sheet (apps-script/Code.gs). check:deploy refuses it.
   if (import.meta.env.VITE_STORAGE_ADAPTER === 'sheet') {
     const { createSheetStore } = await import('./sheetStore');
-    return createSheetStore(import.meta.env.VITE_SHEET_ENDPOINT ?? '');
+    return createSheetStore(import.meta.env.VITE_SHEET_ENDPOINT ?? '', import.meta.env.VITE_IP_LOOKUP_URL);
   }
 
   if (

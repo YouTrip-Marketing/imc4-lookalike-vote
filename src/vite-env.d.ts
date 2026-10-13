@@ -7,6 +7,8 @@ interface ImportMetaEnv {
   readonly VITE_API_BASE_URL?: string;
   /** Sheet adapter only (test site): the Apps Script web app's /exec address. */
   readonly VITE_SHEET_ENDPOINT?: string;
+  /** Sheet adapter only: where the page looks up its own public IP. Default api.ipify.org. */
+  readonly VITE_IP_LOOKUP_URL?: string;
 }
 
 interface ImportMeta {

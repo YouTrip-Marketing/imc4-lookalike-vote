@@ -10,24 +10,38 @@
  * This sheet holds each voter's email in readable form.
  *
  * What it does
- *   doPost  one vote in, one row out. One vote per email, counted the same way
- *           as the site counts it (canonicalEmail below, a copy of
+ *   doPost  one attempt in, one row out. One vote per email, counted the same
+ *           way as the site counts it (canonicalEmail below, a copy of
  *           src/domain/email.ts: tests/apps-script.test.ts checks they agree).
+ *           A repeat from the same email is refused, but still gets a row with
+ *           Duplicate? = TRUE, so the rule can be seen working; the Tally tab
+ *           and doGet leave those rows out.
  *           A LockService lock makes the duplicate check and the append one step.
  *           A repeat of the same vote id (a retry after a lost reply) is
  *           answered with the first answer and never adds a second row.
- *   doGet   every vote without emails: row number, contestant number, time and
- *           a short reference made from the counted email. The admin page at
- *           #/admin builds its tally from this.
+ *   doGet   every counted vote without emails or IPs: row number, contestant
+ *           number, time and a short reference made from the counted email.
+ *           The admin page at #/admin builds its tally from this.
+ *
+ * IP (self-reported): Apps Script cannot see the voter's IP address, so the
+ * page looks up its own public IP and sends it. INDICATIVE ONLY: anyone can
+ * send any value. It is never used to accept or refuse a vote. The production
+ * Supabase API records the real address on the server.
  *
  * Replies are JSON: { ok: true, data: {...} } or { ok: false, error: '<code>' }.
  */
 
+/** The one spreadsheet this script may write to: "Jkook lookalike contest voting site". */
+var SHEET_ID = '1nq_hyBZWk5zbTLuigdTyThQLf94mxaSr_Z3IklOcGEE';
 var VOTES_TAB = 'Votes';
 var CONTESTANT_COUNT = 20;
 var TIME_ZONE = 'Asia/Singapore';
-var HEADER = ['Time (SGT)', 'No.', 'Contestant', 'Email (as typed)', 'Email (counted as)', 'Device', 'Vote ID'];
-var COLUMN = { time: 0, number: 1, name: 2, typed: 3, counted: 4, device: 5, voteId: 6 };
+var HEADER = [
+  'Timestamp (SGT)', 'Email (as typed)', 'Canonical email', 'IP (self-reported)', 'Contestant no.',
+  'Contestant name', 'Vote ID', 'User agent (short)', 'Duplicate?',
+];
+var COLUMN = { time: 0, typed: 1, counted: 2, ip: 3, number: 4, name: 5, voteId: 6, device: 7, duplicate: 8 };
+var FORMATS = ['@', '@', '@', '@', '0', '@', '@', '@', 'General'];
 
 // ------------------------------------------------------------------ email rule
 // Copy of checkEmail + canonicalEmail in src/domain/email.ts. Keep them identical.
@@ -108,47 +122,56 @@ function doPost(e) {
   if (!lock.tryLock(10000)) return reply_({ ok: false, error: 'busy' });
   try {
     var sheet = votesSheet_();
+    if (sheet === null) return reply_({ ok: false, error: 'misconfigured' });
     var rows = readRows_(sheet);
+    var duplicate = false;
     for (var i = 0; i < rows.length; i += 1) {
       var row = rows[i];
       if (plain_(row[COLUMN.voteId]) === voteId) {
-        // The same vote sent again: its first reply was lost. Answer as before.
-        return reply_({ ok: true, data: { duplicate: false, castAt: isoTime_(row[COLUMN.time]), row: i + 2 } });
+        // The same attempt sent again: its first reply was lost. Answer as before.
+        return reply_(
+          row[COLUMN.duplicate] === true
+            ? { ok: true, data: { duplicate: true } }
+            : { ok: true, data: { duplicate: false, castAt: isoTime_(row[COLUMN.time]), row: i + 2 } },
+        );
       }
-      if (plain_(row[COLUMN.counted]) === counted) {
-        return reply_({ ok: true, data: { duplicate: true } });
-      }
+      if (row[COLUMN.duplicate] !== true && plain_(row[COLUMN.counted]) === counted) duplicate = true;
     }
 
     var now = new Date();
     var rowNumber = rows.length + 2;
     var values = [
       Utilities.formatDate(now, TIME_ZONE, 'yyyy-MM-dd HH:mm:ss'),
-      number,
-      safe_(text_(vote.contestantName, 60)),
       safe_(text_(vote.email, 254).trim()),
       safe_(counted),
-      safe_(text_(vote.device, 80)),
+      ipOrUnavailable_(vote.ip),
+      number,
+      safe_(text_(vote.contestantName, 60)),
       voteId,
+      safe_(text_(vote.device, 80)),
+      duplicate,
     ];
-    sheet
-      .getRange(rowNumber, 1, 1, HEADER.length)
-      .setNumberFormats([['@', '0', '@', '@', '@', '@', '@']])
-      .setValues([values]);
+    sheet.getRange(rowNumber, 1, 1, HEADER.length).setNumberFormats([FORMATS]).setValues([values]);
     SpreadsheetApp.flush();
-    return reply_({ ok: true, data: { duplicate: false, castAt: now.toISOString(), row: rowNumber } });
+    return reply_(
+      duplicate
+        ? { ok: true, data: { duplicate: true } }
+        : { ok: true, data: { duplicate: false, castAt: now.toISOString(), row: rowNumber } },
+    );
   } finally {
     lock.releaseLock();
   }
 }
 
 function doGet() {
-  var rows = readRows_(votesSheet_());
+  var sheet = votesSheet_();
+  if (sheet === null) return reply_({ ok: false, error: 'misconfigured' });
+  var rows = readRows_(sheet);
   var votes = [];
   for (var i = 0; i < rows.length; i += 1) {
     var row = rows[i];
     var number = Number(row[COLUMN.number]);
-    if (!(number >= 1)) continue;
+    if (!(number >= 1) || row[COLUMN.duplicate] === true) continue;
     votes.push({
       n: i + 1,
       no: number,
@@ -161,8 +184,10 @@ function doGet() {
 
 // ---------------------------------------------------------------- helpers
 
+/** The Votes tab, or null when this script is attached to some other spreadsheet. */
 function votesSheet_() {
   var book = SpreadsheetApp.getActiveSpreadsheet();
+  if (book === null || book.getId() !== SHEET_ID) return null;
   var sheet = book.getSheetByName(VOTES_TAB);
   if (sheet === null) {
     sheet = book.insertSheet(VOTES_TAB);
@@ -176,6 +201,13 @@ function readRows_(sheet) {
   var last = sheet.getLastRow();
   if (last < 2) return [];
   return sheet.getRange(2, 1, last - 1, HEADER.length).getValues();
+}
+
+/** An IPv4 or IPv6 address as sent by the page, or 'unavailable'. Never trusted for anything. */
+function ipOrUnavailable_(value) {
+  if (typeof value !== 'string') return 'unavailable';
+  var ip = value.trim();
+  return /^[0-9A-Fa-f:.]{3,45}$/.test(ip) && /[.:]/.test(ip) ? ip : 'unavailable';
 }
 
 function text_(value, max) {
