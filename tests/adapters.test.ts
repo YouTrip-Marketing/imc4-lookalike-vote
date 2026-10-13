@@ -367,6 +367,23 @@ describe('the deploy check', () => {
     }
   });
 
+  it('refuses the Google Sheet test build as loudly as the demo', () => {
+    const result = checkDeploy({
+      ...ready,
+      VITE_STORAGE_ADAPTER: 'sheet',
+      VITE_SHEET_ENDPOINT: 'https://script.google.com/macros/s/abc/exec',
+    });
+    expect(result.ok).toBe(false);
+    expect(result.problems.join(' ')).toMatch(/TEST build/);
+    expect(result.problems.join(' ')).toMatch(/must never be published/);
+  });
+
+  it('refuses a production build that still carries the test sheet address', () => {
+    const result = checkDeploy({ ...ready, VITE_SHEET_ENDPOINT: 'https://script.google.com/macros/s/abc/exec' });
+    expect(result.ok).toBe(false);
+    expect(result.problems.join(' ')).toMatch(/VITE_SHEET_ENDPOINT/);
+  });
+
   it.each([undefined, '', '/api', 'http://project-ref.supabase.co/functions/v1/vote-api', 'https://host'])(
     'refuses an API address of "%s": GitHub Pages has no server of its own',
     (base) => {

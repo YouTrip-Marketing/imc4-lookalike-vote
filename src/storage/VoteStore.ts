@@ -17,7 +17,7 @@ import type {
  * checks in the views are there for a good experience, not for integrity.
  */
 export interface VoteStore {
-  readonly kind: 'local' | 'api';
+  readonly kind: 'local' | 'api' | 'sheet';
   /** True when the data is a mock. Views show a DEMO DATA banner. */
   readonly isDemo: boolean;
 

@@ -83,9 +83,21 @@ export function checkDeploy(
   const problems: string[] = repository === undefined ? [] : checkRepository(repository);
   const warnings: string[] = [];
 
-  if (env.VITE_STORAGE_ADAPTER !== 'api') {
+  if (env.VITE_STORAGE_ADAPTER === 'sheet') {
+    // The Google Sheet test build is treated exactly like the demo: never the real page.
+    problems.push(
+      'VITE_STORAGE_ADAPTER is "sheet": a TEST build that writes votes, with readable emails, to a ' +
+        'Google Sheet. Voting is always open in it and its admin passcode is the demo one. ' +
+        'It is not the real voting page and must never be published as one. Set "api" in .env.production.',
+    );
+  } else if (env.VITE_STORAGE_ADAPTER !== 'api') {
     problems.push(
       'VITE_STORAGE_ADAPTER is not "api". This build would publish the DEMO. Set it in .env.production.',
+    );
+  }
+  if ((env.VITE_SHEET_ENDPOINT ?? '').trim() !== '') {
+    problems.push(
+      'VITE_SHEET_ENDPOINT is set. That is the TEST Google Sheet; remove it from the production build.',
     );
   }
 

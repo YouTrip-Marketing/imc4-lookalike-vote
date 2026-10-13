@@ -19,6 +19,7 @@ e2e-artifacts/
 .env*
 !.env.example
 !.env.production.example
+!.env.sheet-test.example
 # Never commit vote logs or audit exports, real or sample.
 *.csv
 *audit*export*

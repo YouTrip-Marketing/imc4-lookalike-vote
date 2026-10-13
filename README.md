@@ -733,6 +733,70 @@ makes no mention of any prize. `tests/config.test.ts` and the end-to-end test
 fail if the voter-facing copy mentions cash, prizes, flights or a draw, or if
 either removed paragraph comes back.
 
+## Test votes into a Google Sheet (test site only, 2026-10-13)
+
+A third storage adapter, `sheet`, sends each vote from the TEST SITE to a Google
+Apps Script web app bound to a Google Sheet. Each vote becomes one row, so you
+can watch votes land while testing on a phone. **Production is unchanged: the
+real vote uses the `api` adapter and Supabase.** `npm run check:deploy` refuses
+a `sheet` build, and any build that still has `VITE_SHEET_ENDPOINT` set.
+
+| Piece | Where |
+|---|---|
+| Receiver (paste into Apps Script) | `apps-script/Code.gs` |
+| Page adapter | `src/storage/sheetStore.ts` |
+| Build settings | `.env.sheet-test.example`, copy to `.env.sheet-test` |
+| Tests | `tests/apps-script.test.ts`, `tests/sheet-store.test.ts`, e2e Part C |
+
+**What lands in the sheet.** Tab `Votes`, one row per vote: Time (SGT), No.,
+Contestant, Email (as typed), Email (counted as), Device (e.g. "iPhone ·
+Instagram"), Vote ID. Tab `Tally`: one COUNTIF per contestant and a total.
+
+**Rules the script enforces.** One vote per email, using the site's rule
+(Gmail dots and `+tag` folded; others as typed). A script lock makes the check
+and the write one step. A retried vote id gets its first answer back and adds no
+row. Typed values starting with `=`, `+`, `-` or `@` are stored as text, never
+as formulas. Voting is always open on the test site; the window is shown, not
+enforced. Open/Close in `#/admin` do nothing here, and the audit export points
+to the sheet.
+
+**Privacy.** The sheet holds readable emails. That is fine for internal testing
+only. Legal's position (emails only in the confidential export) applies to
+production.
+
+### Deploying the receiver (Kelicia, in the browser, once)
+
+Google needs the sheet owner's own authorisation, so nobody else can do this step.
+
+1. Open the sheet. Menu **Extensions > Apps Script**. A new tab opens with `Code.gs`.
+2. Select everything in `Code.gs` and delete it. Paste the whole of `apps-script/Code.gs`. Click the **Save** (disk) icon.
+3. Top right, blue **Deploy** button > **New deployment**.
+4. Next to "Select type", click the **gear** icon > **Web app**.
+5. Description: `IMC4 test votes`. **Execute as: Me**. **Who has access: Anyone**. (Not "Anyone with Google account" and not "Anyone within YouTrip": phones voting from Instagram are not signed in.)
+6. Click **Deploy**. Then **Authorize access** > pick your account. If you see "Google hasn't verified this app", click **Advanced** > **Go to (project name) (unsafe)** > **Allow**. It is your own script.
+7. Copy the **Web app URL**. It ends in `/exec`. That is `VITE_SHEET_ENDPOINT`.
+
+If "Anyone" is missing from the access list, the YouTrip Google Workspace admin
+has switched it off. Then the receiver must live in a sheet on a personal Google
+account, or the admin must allow it.
+
+**Changing the script later:** Deploy > **Manage deployments** > pencil icon >
+Version: **New version** > Deploy. This keeps the same `/exec` address. A "New
+deployment" makes a new address, and the site would need rebuilding.
+
+### Building and publishing the test site with the sheet
+
+```bash
+cp .env.sheet-test.example .env.sheet-test      # then paste the /exec address into it
+npm run build:sheet-test                        # VITE_STORAGE_ADAPTER=sheet, VITE_TEST_DEPLOY=1
+touch dist/.nojekyll
+cd dist && git add -A && git commit -m "Test site: votes to Google Sheet" \
+  && git push -f https://github.com/YouTrip-Marketing/imc4-lookalike-vote-test.git gh-pages:gh-pages
+```
+
+To go back to the browser-only demo on the test site, rebuild with
+`VITE_TEST_DEPLOY=1 npm run build` and publish the same way.
+
 ## Tests
 
 ```bash

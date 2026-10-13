@@ -5,6 +5,8 @@ interface ImportMetaEnv {
   /** '1' only in the build made by `npm run deploy:test`. Changes the demo banner to TEST SITE. */
   readonly VITE_TEST_DEPLOY?: string;
   readonly VITE_API_BASE_URL?: string;
+  /** Sheet adapter only (test site): the Apps Script web app's /exec address. */
+  readonly VITE_SHEET_ENDPOINT?: string;
 }
 
 interface ImportMeta {

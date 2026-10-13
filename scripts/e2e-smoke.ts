@@ -27,6 +27,7 @@ import { build, preview, type Plugin, type PreviewServer } from 'vite';
 import { burstRule, contestants, demo, event, keyVisual, promoBanner, votingWindow } from '../event.config';
 import { formatCalendarDate, formatSgtDateTime } from '../src/domain/time';
 import { startLocalApiServer, type LocalApiServer } from './local-api-server';
+import { startSheetStubServer, type SheetStubServer } from './sheet-stub-server';
 
 const ROOT = resolve(import.meta.dirname, '..');
 const OUT = resolve(ROOT, 'e2e-artifacts');
@@ -51,6 +52,8 @@ const SITE_PORT_PROD = 4180;
 const SITE_PORT_KV = 4181;
 const SITE_PORT_NO_KV = 4182;
 const SITE_PORT_PROD_NO_KV = 4183;
+const SITE_PORT_SHEET = 4184;
+const SHEET_STUB_PORT = 4190;
 const API_PORT = 54329;
 const PROD_PASSCODE = 'e2e-admin-passcode-not-a-secret';
 const PROD_HASH_SECRET = 'e2e-hash-secret-not-a-secret-0123456789';
@@ -377,7 +380,9 @@ function filesUnder(dir: string): string[] {
 }
 
 async function buildSite(outDir: string, env: Record<string, string>, plugins: Plugin[] = []): Promise<void> {
-  for (const key of ['VITE_STORAGE_ADAPTER', 'VITE_API_BASE_URL']) delete process.env[key];
+  for (const key of ['VITE_STORAGE_ADAPTER', 'VITE_API_BASE_URL', 'VITE_SHEET_ENDPOINT', 'VITE_TEST_DEPLOY']) {
+    delete process.env[key];
+  }
   Object.assign(process.env, env);
   await build({ root: ROOT, logLevel: 'error', plugins, build: { outDir, emptyOutDir: true } });
 }
@@ -586,6 +591,76 @@ async function shot(page: Page, name: string, fullPage = false): Promise<void> {
     await page.evaluate(() => (document.activeElement as HTMLElement | SVGElement | null)?.blur());
   }
   await page.screenshot({ path: join(OUT, `${name}.png`) as `${string}.png`, fullPage });
+}
+
+// ------------------------------------------------------------------ Part C
+
+/** The Google Sheet test build against a stand-in that runs the real Code.gs. */
+async function partC(browser: Browser, site: string, stub: SheetStubServer, outDir: string): Promise<void> {
+  const context = await browser.createBrowserContext();
+  const voter = await open(context, `${site}/`, { userAgent: INSTAGRAM_UA });
+  const rows = (): (string | number | Date)[][] => stub.script.votes()?.rows.slice(1) ?? [];
+
+  await step('sheet build: TEST SITE banner, voting open today, configured close time shown', async () => {
+    await see(voter, 'TEST SITE');
+    await see(voter, 'Votes are not real.');
+    assert.equal(await cardsDisabled(voter), false);
+    await see(voter, `Voting closes ${formatSgtDateTime(votingWindow.closesAt)}.`);
+  });
+
+  await step('sheet build: a vote becomes one row (number, name, email typed and counted, device)', async () => {
+    await voteFor(voter, 7, 'Test+1@Example.com');
+    await see(voter, 'Done. Your vote is counted.');
+    const all = rows();
+    assert.equal(all.length, 1);
+    const [time, number, name, typed, counted, device, voteId] = all[0] ?? [];
+    assert.match(String(time), /^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d$/);
+    assert.deepEqual([number, name, typed, counted, device], [7, 'Contestant 7', 'Test+1@Example.com', 'test+1@example.com', 'iPhone · Instagram']);
+    assert.match(String(voteId), /^[A-Za-z0-9-]{8,64}$/);
+    assert.equal(stub.preflights(), 0, 'the page triggered a CORS preflight, which Apps Script cannot answer');
+    await shot(voter, 'sheet-01-vote-counted');
+  });
+
+  await step('sheet build: the same email from another phone is refused, and no row is added', async () => {
+    const other = await open(await browser.createBrowserContext(), `${site}/`);
+    await voteFor(other, 12, '  test+1@example.com');
+    await see(other, DUPLICATE);
+    assert.equal(rows().length, 1);
+    await other.close();
+  });
+
+  await step('sheet build: Gmail spellings of one inbox count once', async () => {
+    const first = await open(await browser.createBrowserContext(), `${site}/`);
+    await voteFor(first, 3, 'jane.doe@gmail.com');
+    await see(first, 'Done. Your vote is counted.');
+    const second = await open(await browser.createBrowserContext(), `${site}/`);
+    await voteFor(second, 4, 'JaneDoe+again@googlemail.com');
+    await see(second, DUPLICATE);
+    assert.equal(rows().length, 2);
+    await first.close();
+    await second.close();
+  });
+
+  await step('sheet build: #/admin reads the tally from the sheet, with no emails on screen', async () => {
+    const admin = await open(await browser.createBrowserContext(), `${site}/#/admin`, { viewport: LAPTOP });
+    await unlockAdmin(admin, demo.passcode);
+    await votesCounted(admin, 2);
+    const body = await text(admin);
+    assert.equal(/@example\.com|@gmail\.com/i.test(body), false, 'an email address is on the admin screen');
+    await shot(admin, 'sheet-02-admin', true);
+    await admin.close();
+  });
+
+  await step('sheet build: the bundle carries the sheet address and no production API code', async () => {
+    const bundle = filesUnder(outDir)
+      .filter((file) => file.endsWith('.js'))
+      .map((file) => readFileSync(file, 'utf8'))
+      .join('\n');
+    assert.ok(bundle.includes(`${stub.url}/exec`));
+    assert.equal(bundle.includes('VITE_API_BASE_URL must be'), false, 'the api store is in the sheet bundle');
+  });
+
+  await context.close();
 }
 
 // ------------------------------------------------------------------ Part A
@@ -1846,6 +1921,7 @@ async function main(): Promise<void> {
   const browser = await puppeteer.launch({ executablePath: chrome, headless: true });
   const servers: PreviewServer[] = [];
   let api: LocalApiServer | null = null;
+  let sheetStub: SheetStubServer | null = null;
 
   try {
     console.log('\nPart A: demo build, local adapter');
@@ -1917,8 +1993,16 @@ async function main(): Promise<void> {
 
     await partB(browser, prodSite, api, prodDir, demoSite);
 
+    console.log('\nPart C: Google Sheet test build against a stand-in running apps-script/Code.gs');
+    sheetStub = await startSheetStubServer(SHEET_STUB_PORT);
+    const sheetDir = join(BUILDS, 'sheet');
+    await buildSite(sheetDir, { VITE_STORAGE_ADAPTER: 'sheet', VITE_SHEET_ENDPOINT: `${sheetStub.url}/exec` });
+    servers.push(await serve(sheetDir, SITE_PORT_SHEET));
+    const sheetSite = `http://127.0.0.1:${SITE_PORT_SHEET}`;
+    await partC(browser, sheetSite, sheetStub, sheetDir);
+
     await step('no request left localhost: no trackers, fonts or third parties', async () => {
-      const allowed = new Set([demoSite, prodSite, kvSite, noKvSite, prodNoKvSite, api?.url, 'null']);
+      const allowed = new Set([demoSite, prodSite, kvSite, noKvSite, prodNoKvSite, sheetSite, sheetStub?.url, api?.url, 'null']);
       const foreign = [...requestsSeen].filter((origin) => !allowed.has(origin));
       assert.deepEqual(foreign, []);
       assert.equal(
@@ -1964,6 +2048,7 @@ async function main(): Promise<void> {
       await new Promise<void>((resolveClose) => server.httpServer.close(() => resolveClose()));
     }
     await api?.close();
+    await sheetStub?.close();
     rmSync(BUILDS, { recursive: true, force: true });
   }
 }
