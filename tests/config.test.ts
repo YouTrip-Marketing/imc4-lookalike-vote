@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, statSync } from 'node:fs';
 import { resolve } from 'node:path';
 /**
  * Guards on event.config.ts itself: the things the brief fixes, and the things
@@ -55,23 +55,33 @@ describe('event.config.ts', () => {
 
   describe('key visual (Revision 8: Kelicia\'s "Top 20" creative, 2026-10-05)', () => {
     const publicFile = (path: string | null | undefined): string => resolve(import.meta.dirname, '..', 'public', path ?? '');
-    /** Width and height from a PNG's IHDR chunk, so the test needs no image library. */
-    const pngSize = (path: string): { width: number; height: number } => {
+    /**
+     * Width and height from a lossy WebP's VP8 frame header, so the test needs no
+     * image library. The 26 Oct 2026 revision is quality-90 WebP (250 KB spec).
+     */
+    const webpSize = (path: string): { width: number; height: number } => {
       const bytes = readFileSync(path);
-      expect(bytes.subarray(1, 4).toString('latin1')).toBe('PNG');
-      return { width: bytes.readUInt32BE(16), height: bytes.readUInt32BE(20) };
+      expect(bytes.subarray(0, 4).toString('latin1')).toBe('RIFF');
+      expect(bytes.subarray(8, 16).toString('latin1')).toBe('WEBPVP8 ');
+      expect([...bytes.subarray(23, 26)]).toEqual([0x9d, 0x01, 0x2a]);
+      return { width: bytes.readUInt16LE(26) & 0x3fff, height: bytes.readUInt16LE(28) & 0x3fff };
     };
 
     it('points at the supplied phone (16:9) and desktop (3:1) files, under the project naming convention', () => {
-      expect(keyVisual.mobile).toBe('key-visual/imc4-lookalike-kv-1080x608.png');
-      expect(keyVisual.desktop).toBe('key-visual/imc4-lookalike-kv-1920x640.png');
+      expect(keyVisual.mobile).toBe('key-visual/imc4-lookalike-kv-1080x608.webp');
+      expect(keyVisual.desktop).toBe('key-visual/imc4-lookalike-kv-1920x640.webp');
       expect(existsSync(publicFile(keyVisual.mobile))).toBe(true);
       expect(existsSync(publicFile(keyVisual.desktop))).toBe(true);
     });
 
     it('uses files of the sizes the slot is built for: 1080 x 608 on phones, 1920 x 640 on desktop', () => {
-      expect(pngSize(publicFile(keyVisual.mobile))).toEqual({ width: 1080, height: 608 });
-      expect(pngSize(publicFile(keyVisual.desktop))).toEqual({ width: 1920, height: 640 });
+      expect(webpSize(publicFile(keyVisual.mobile))).toEqual({ width: 1080, height: 608 });
+      expect(webpSize(publicFile(keyVisual.desktop))).toEqual({ width: 1920, height: 640 });
+    });
+
+    it('keeps both files under the 250 KB spec', () => {
+      expect(statSync(publicFile(keyVisual.mobile)).size).toBeLessThanOrEqual(250 * 1024);
+      expect(statSync(publicFile(keyVisual.desktop)).size).toBeLessThanOrEqual(250 * 1024);
     });
 
     it('has the agreed alt text', () => {

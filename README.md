@@ -138,9 +138,11 @@ upload feature**: drop the files in `public/key-visual/` and set `keyVisual` in
 
 ### The real key visual and its colour band (Revision 8, 2026-10-05)
 
-Kelicia's "Top 20" key visual, used exactly as supplied (PNG, not re-encoded):
-`public/key-visual/imc4-lookalike-kv-1080x608.png` (16:9, below 900px, 700 KB)
-and `imc4-lookalike-kv-1920x640.png` (3:1, from 900px, 1204 KB). Alt text:
+Kelicia's "Top 20" key visual (revised 26 Oct 2026), re-encoded from her PNGs to
+quality-90 WebP to meet the 250 KB spec:
+`public/key-visual/imc4-lookalike-kv-1080x608.webp` (16:9, below 900px, 68 KB)
+and `imc4-lookalike-kv-1920x640.webp` (3:1, from 900px, 97 KB). Her source PNGs
+are in `builds/_archive/imc4-lookalike-voting-rev9-kv-png-lookalikes/new-source-26oct/`. Alt text:
 "Top 20 K-pop idol lookalikes. YouTrip. Voting closes 5 Nov. T&Cs apply." It must
 never name the artist (unit-tested).
 
@@ -154,8 +156,8 @@ banner's edges is at most 2/255 per channel at every width (invisible).
 | | Phone image (below 900px) | Desktop image (from 900px) |
 |---|---|---|
 | Left edge | `#12003C` | `#000026` |
-| Middle | `#3B0B74` | `#280065` |
-| Right edge | `#6920AF` | `#5F1AA7` |
+| Middle | `#3B1C7D` | `#2C1072` |
+| Right edge | `#6845C0` | `#6945C0` |
 | Fade below the banner | 112px | 160px |
 
 Eleven stops per image, every 10%, are in the CSS. **A new creative with a

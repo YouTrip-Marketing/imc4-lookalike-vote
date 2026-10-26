@@ -494,14 +494,13 @@ describe('the deploy check', () => {
       expect(result.ok).toBe(true);
     });
 
-    it('as configured today: no longer says the key visual is missing, and flags the two PNGs as over 250 KB', () => {
+    it('as configured today: no longer says the key visual is missing, and the two WebPs are within 250 KB', () => {
       const project = resolve(import.meta.dirname, '..', 'public');
       const text = checkDeploy(ready, { ...base, keyVisual }, undefined, project).warnings.join(' ');
       expect(text).not.toMatch(/No key visual is set/);
       expect(text).not.toMatch(/key visual has no alt text/i);
       expect(text).not.toMatch(/Key visual file not found/);
-      expect(text).toMatch(/Key visual file is \d+ KB: public\/key-visual\/imc4-lookalike-kv-1080x608\.png/);
-      expect(text).toMatch(/Key visual file is \d+ KB: public\/key-visual\/imc4-lookalike-kv-1920x640\.png/);
+      expect(text).not.toMatch(/Key visual file is \d+ KB/);
     });
 
     it('warns about missing alt text and missing files', () => {

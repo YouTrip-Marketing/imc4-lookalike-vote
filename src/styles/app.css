@@ -432,15 +432,15 @@ strong {
   /* Phone image, 1080 x 608: used below 900px. */
   --kv-0: #12003c;
   --kv-10: #1b0048;
-  --kv-20: #200150;
-  --kv-30: #28045b;
-  --kv-40: #33076a;
-  --kv-50: #3b0b74;
-  --kv-60: #430f7f;
-  --kv-70: #4e138c;
-  --kv-80: #58179a;
-  --kv-90: #5f1ca3;
-  --kv-100: #6920af;
+  --kv-20: #200653;
+  --kv-30: #290c60;
+  --kv-40: #32136d;
+  --kv-50: #3b1c7d;
+  --kv-60: #432488;
+  --kv-70: #4d2b96;
+  --kv-80: #5734a5;
+  --kv-90: #5f3cb2;
+  --kv-100: #6845c0;
   position: relative;
   margin: 0 0 16px;
 }
@@ -1357,16 +1357,16 @@ a.promo-banner:focus-visible {
   .kv-band--desktop {
     --kv-fade: 160px;
     --kv-0: #000026;
-    --kv-10: #030033;
-    --kv-20: #09003e;
-    --kv-30: #14004b;
-    --kv-40: #1d0057;
-    --kv-50: #280065;
-    --kv-60: #330472;
-    --kv-70: #3d097f;
-    --kv-80: #490e8d;
-    --kv-90: #54149a;
-    --kv-100: #5f1aa7;
+    --kv-10: #030035;
+    --kv-20: #0b0042;
+    --kv-30: #160052;
+    --kv-40: #200760;
+    --kv-50: #2c1072;
+    --kv-60: #381a80;
+    --kv-70: #44248f;
+    --kv-80: #502fa0;
+    --kv-90: #5c3ab0;
+    --kv-100: #6945c0;
   }
 
   /* The demo placeholder takes the desktop shape too, so a laptop shows the room a desktop creative will take. */
