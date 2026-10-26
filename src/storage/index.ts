@@ -18,10 +18,14 @@ export async function createVoteStore(): Promise<VoteStore> {
     return new ApiVoteStore({ baseUrl: import.meta.env.VITE_API_BASE_URL ?? '/api' });
   }
 
-  // TEST SITE only: votes go to a Google Sheet (apps-script/Code.gs). check:deploy refuses it.
+  // Votes go to a Google Sheet (apps-script/Code.gs). Production, or the test site with VITE_TEST_DEPLOY=1.
   if (import.meta.env.VITE_STORAGE_ADAPTER === 'sheet') {
     const { createSheetStore } = await import('./sheetStore');
-    return createSheetStore(import.meta.env.VITE_SHEET_ENDPOINT ?? '', import.meta.env.VITE_IP_LOOKUP_URL);
+    return createSheetStore(
+      import.meta.env.VITE_SHEET_ENDPOINT ?? '',
+      import.meta.env.VITE_IP_LOOKUP_URL,
+      import.meta.env.VITE_TEST_DEPLOY === '1',
+    );
   }
 
   if (

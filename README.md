@@ -733,6 +733,45 @@ makes no mention of any prize. `tests/config.test.ts` and the end-to-end test
 fail if the voter-facing copy mentions cash, prizes, flights or a draw, or if
 either removed paragraph comes back.
 
+## Launch: the real voting site (26 Oct 2026)
+
+**URL:** https://youtrip-marketing.github.io/imc4-lookalike-vote/ (repo `YouTrip-Marketing/imc4-lookalike-vote`, public, `gh-pages` branch only; never push `main`). Until the real build is published it shows a one-line holding page.
+
+**Vote store:** Kelicia's private Google Sheet (`1nq_hyBZWk5zbTLuigdTyThQLf94mxaSr_Z3IklOcGEE`) through `apps-script/Code.gs`. Code.gs enforces the voting window (2 Nov 12:00 to 5 Nov 23:59 SGT, same as `event.config.ts`, unit-tested), one vote per email, and the admin passcode for the tally. The page shows no banner and follows the same window. Admin Open/Close is disabled: the window opens and closes by itself.
+
+**Admin passcode:** only its SHA-256 is in Code.gs (`ADMIN_KEY_SHA256`); the passcode itself is in `developer/outbox/imc4-voting-site-ADMIN-PASSCODE.txt` (gitignored) and never in the page. `#/admin` sends it to Code.gs, which answers the tally only to the right passcode.
+
+### 1. Kelicia: deploy Code.gs (once, in the browser)
+Paste the CURRENT `apps-script/Code.gs`: it changed on 26 Oct (window, admin passcode).
+1. Open the sheet. **Extensions > Apps Script**.
+2. Select everything in `Code.gs`, delete, paste the whole file (`pbcopy < apps-script/Code.gs`). **Save**.
+3. **Deploy > New deployment**. Gear next to "Select type" > **Web app**.
+4. **Execute as: Me**. **Who has access: Anyone**.
+5. **Deploy** > **Authorize access** > her account > (if warned) **Advanced** > **Go to … (unsafe)** > **Allow**.
+6. Copy the **Web app URL** (ends in `/exec`).
+
+If "Anyone" is not offered (Workspace policy), use a personal Google account: share the sheet with it as Editor, and do steps 1–6 from that account. The script refuses any spreadsheet but this one.
+Later changes to Code.gs: **Deploy > Manage deployments > pencil > New version**. Same URL.
+
+### 2. Build and publish (3 commands)
+```bash
+cp .env.production.example .env.production   # paste the /exec URL into VITE_SHEET_ENDPOINT
+npm run build:prod && touch dist-prod/.nojekyll   # runs check:deploy first; refuses anything not ready
+cd dist-prod && git add -A && git commit -m "Publish voting site" && git push https://github.com/YouTrip-Marketing/imc4-lookalike-vote.git gh-pages:gh-pages
+```
+`dist-prod/` is its own git repo on branch `gh-pages`; Vite keeps `dist-prod/.git` when it rebuilds.
+
+### 3. Check, then clean up
+1. Open the URL: no banner, "Voting opens soon", Mon 2 Nov 12:00pm SGT.
+2. One organiser test vote (outside the window it needs the admin passcode, which the page never sends): POST to the `/exec` URL with `adminKey`, e.g. from `scripts/` or curl. Confirm the row in **Votes** and the **Tally**, then delete that row.
+3. `#/admin` with the passcode: the tally loads.
+
+### Known limits
+- Emails are not verified: anyone can vote once per made-up address. One-time-code verification was recommended and never decided; it cannot be built by 2 Nov.
+- IP is self-reported by the page (api.ipify.org), indicative only and forgeable. Never used to refuse a vote.
+- Apps Script quotas: about 30 simultaneous executions; a burst of votes may see "busy" and retry automatically (4 tries with backoff).
+- The tally is read by `#/admin` with the passcode; there are no public counts.
+
 ## Revision 10: Kelicia's test feedback (2026-10-13)
 
 1. **Back to every contestant after voting.** A "See all contestants" button in the voted state scrolls to the grid. The vote stays locked. The phone's Back gesture closes the promo pop-up instead of leaving the site.
@@ -744,7 +783,7 @@ either removed paragraph comes back.
 7. **Promo pop-up after a vote** (`PromoPopup` in `src/ui/PromoBanner.tsx`). It holds the creative and a Close button, and links to `promoBanner.href` once that is set. Before a vote the promo is not on the page. Once voted, or when voting is not open, it also sits at the bottom.
 8. **Top 10 line:** "Top 10 will be announced Saturday, 7 Nov." (from `event.top10AnnouncedOn`).
 
-## Test votes into a Google Sheet (test site only, 2026-10-13)
+## Test votes into a Google Sheet (2026-10-13; production since 26 Oct, see Launch)
 
 A third storage adapter, `sheet`, sends each vote from the TEST SITE to a Google
 Apps Script web app bound to a Google Sheet. Each vote becomes one row, so you

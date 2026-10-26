@@ -1,6 +1,7 @@
-import { contestants as configuredContestants, demo, votingRules, votingWindow } from '../../event.config';
+import { contestants as configuredContestants, votingRules, votingWindow } from '../../event.config';
 import { canonicalEmail } from '../domain/email';
 import { VoteError, isVoteErrorCode } from '../domain/errors';
+import { effectiveStatus } from '../domain/voting';
 import type {
   AdminSnapshot,
   AdminVoteRow,
@@ -9,7 +10,6 @@ import type {
   ContestantId,
   EventState,
   PublicSession,
-  Tally,
   VoteReceipt,
   VotingRules,
   VotingWindow,
@@ -17,15 +17,16 @@ import type {
 import type { VoteStore } from './VoteStore';
 
 /**
- * TEST SITE store (VITE_STORAGE_ADAPTER=sheet). Sends each vote to a Google
- * Apps Script web app bound to a Google Sheet (apps-script/Code.gs), which
- * appends it as a row. For Kelicia to watch votes land while testing on a phone.
+ * Google Sheet store (VITE_STORAGE_ADAPTER=sheet). Sends each vote to a Google
+ * Apps Script web app bound to Kelicia's private sheet (apps-script/Code.gs),
+ * which appends it as a row. The production vote store from 26 Oct 2026.
  *
- * NOT FOR THE REAL VOTE:
- *   - voting is always open: the configured window is shown, not enforced;
- *   - the sheet holds readable emails, with no audit table or retention rule;
- *   - the admin passcode is the demo one, checked in the page.
- * `npm run check:deploy` refuses this build, like the demo.
+ *   Production (default): no banner; the voting window from event.config.ts is
+ *     shown and honoured here, and enforced again by Code.gs. The admin
+ *     passcode is checked by Code.gs (doGet ?key=...), never by this page, so
+ *     it is not in the bundle.
+ *   Test (testMode, VITE_TEST_DEPLOY=1): TEST SITE banner, voting always shown
+ *     as open (Code.gs still enforces the window).
  *
  * Requests go as text/plain so the browser sends them without a CORS
  * preflight, which Apps Script web apps cannot answer.
@@ -45,7 +46,8 @@ export interface SheetStoreOptions {
   contestants: readonly Pick<Contestant, 'id' | 'number' | 'stageName'>[];
   window: VotingWindow;
   rules: VotingRules;
-  passcode: string;
+  /** VITE_TEST_DEPLOY=1: TEST SITE banner and voting always shown as open. */
+  testMode?: boolean;
   fetch?: typeof fetch;
   timeoutMs?: number;
   now?: () => Date;
@@ -107,8 +109,8 @@ export function deviceLabel(userAgent: string): string {
 
 export class SheetVoteStore implements VoteStore {
   readonly kind = 'sheet' as const;
-  /** Shows the TEST SITE banner. */
-  readonly isDemo = true;
+  /** Shows the TEST SITE banner. False in production. */
+  readonly isDemo: boolean;
 
   private readonly endpoint: string;
   private readonly fetchImpl: typeof fetch;
@@ -128,6 +130,7 @@ export class SheetVoteStore implements VoteStore {
       );
     }
     this.endpoint = endpoint;
+    this.isDemo = options.testMode === true;
     this.fetchImpl = options.fetch ?? globalThis.fetch.bind(globalThis);
     // Apps Script often takes a few seconds on the first request after a quiet spell.
     this.timeoutMs = options.timeoutMs ?? 15_000;
@@ -172,24 +175,25 @@ export class SheetVoteStore implements VoteStore {
   }
 
   private state(): EventState {
+    const now = this.now();
     return {
-      status: 'open',
-      adminStatus: 'open',
+      status: this.isDemo ? 'open' : effectiveStatus('pending', this.options.window, now),
+      adminStatus: this.isDemo ? 'open' : 'pending',
       opensAt: this.options.window.opensAt,
       closesAt: this.options.window.closesAt,
       // The sheet keeps the first vote per email and never replaces it.
       allowVoteChange: false,
       publicCounts: this.options.rules.publicCounts,
-      serverTime: this.now().toISOString(),
+      serverTime: now.toISOString(),
     };
   }
 
-  private async request(init: RequestInit): Promise<unknown> {
+  private async request(init: RequestInit, query = ''): Promise<unknown> {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), this.timeoutMs);
     let response: Response;
     try {
-      response = await this.fetchImpl(this.endpoint, {
+      response = await this.fetchImpl(`${this.endpoint}${query}`, {
         ...init,
         signal: controller.signal,
         cache: 'no-store',
@@ -221,8 +225,8 @@ export class SheetVoteStore implements VoteStore {
     throw new VoteError(isVoteErrorCode(envelope.error) ? envelope.error : 'misconfigured');
   }
 
-  private async readVotes(): Promise<{ takenAt: string; votes: SheetVote[] }> {
-    const data = await this.request({ method: 'GET' });
+  private async readVotes(passcode: string): Promise<{ takenAt: string; votes: SheetVote[] }> {
+    const data = await this.request({ method: 'GET' }, `?key=${encodeURIComponent(passcode)}`);
     if (typeof data !== 'object' || data === null || !Array.isArray((data as { votes?: unknown }).votes)) {
       throw new VoteError('misconfigured', 'Unexpected answer from the sheet.');
     }
@@ -239,20 +243,12 @@ export class SheetVoteStore implements VoteStore {
     return { takenAt: typeof takenAt === 'string' ? takenAt : this.now().toISOString(), votes: parsed };
   }
 
-  private tallies(votes: readonly SheetVote[]): Tally[] {
-    const counts = new Map<ContestantId, number>(this.options.contestants.map((c) => [c.id, 0]));
-    for (const vote of votes) {
-      const id = this.byNumber.get(vote.no);
-      if (id !== undefined) counts.set(id, (counts.get(id) ?? 0) + 1);
-    }
-    return [...counts].map(([contestantId, count]) => ({ contestantId, votes: count }));
-  }
-
+  /**
+   * Never asks the sheet: the counts need the admin passcode, so public counts
+   * (votingRules.publicCounts) are not available with this store.
+   */
   async getSession(): Promise<PublicSession> {
-    // Counts cost a request to the sheet, so they are fetched only when shown.
-    if (!this.options.rules.publicCounts) return { state: this.state(), tallies: null };
-    const { votes } = await this.readVotes();
-    return { state: this.state(), tallies: this.tallies(votes) };
+    return { state: this.state(), tallies: null };
   }
 
   async castVote(contestantId: ContestantId, email: string, requestId: string): Promise<VoteReceipt> {
@@ -289,8 +285,8 @@ export class SheetVoteStore implements VoteStore {
   }
 
   async adminGetSnapshot(passcode: string): Promise<AdminSnapshot> {
-    if (passcode !== this.options.passcode) throw new VoteError('bad_passcode');
-    const { takenAt, votes } = await this.readVotes();
+    if (passcode.trim() === '') throw new VoteError('bad_passcode');
+    const { takenAt, votes } = await this.readVotes(passcode);
     const rows: AdminVoteRow[] = [];
     for (const vote of votes) {
       const contestantId = this.byNumber.get(vote.no);
@@ -302,13 +298,13 @@ export class SheetVoteStore implements VoteStore {
   }
 
   async adminGetAudit(passcode: string): Promise<AuditRow[]> {
-    if (passcode !== this.options.passcode) throw new VoteError('bad_passcode');
-    throw new VoteError('misconfigured', 'Test site: the emails are in the Google Sheet.');
+    await this.adminGetSnapshot(passcode);
+    throw new VoteError('misconfigured', 'The emails are in the Google Sheet.');
   }
 
   async adminSetStatus(passcode: string): Promise<EventState> {
-    if (passcode !== this.options.passcode) throw new VoteError('bad_passcode');
-    throw new VoteError('misconfigured', 'Test site: voting stays open.');
+    await this.adminGetSnapshot(passcode);
+    throw new VoteError('misconfigured', 'Voting opens and closes by itself at the times in event.config.ts.');
   }
 
   subscribe(): () => void {
@@ -317,13 +313,13 @@ export class SheetVoteStore implements VoteStore {
 }
 
 /** Wires the sheet store to event.config.ts. */
-export function createSheetStore(endpoint: string, ipLookupUrl?: string): SheetVoteStore {
+export function createSheetStore(endpoint: string, ipLookupUrl?: string, testMode = false): SheetVoteStore {
   const store = new SheetVoteStore({
     endpoint,
     contestants: configuredContestants,
     window: votingWindow,
     rules: votingRules,
-    passcode: demo.passcode,
+    testMode,
     userAgent: typeof navigator === 'undefined' ? '' : navigator.userAgent,
     ipLookupUrl: ipLookupUrl === undefined || ipLookupUrl.trim() === '' ? DEFAULT_IP_LOOKUP_URL : ipLookupUrl.trim(),
   });

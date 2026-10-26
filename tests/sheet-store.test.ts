@@ -1,17 +1,20 @@
 import { describe, expect, it, vi } from 'vitest';
-import { contestants, demo, votingRules, votingWindow } from '../event.config';
+import { contestants, votingRules, votingWindow } from '../event.config';
 import { VoteError } from '../src/domain/errors';
 import { SheetVoteStore, deviceLabel, type SheetStoreOptions } from '../src/storage/sheetStore';
 import { loadAppsScript, type AppsScriptRun } from '../scripts/apps-script-harness';
 
 const ENDPOINT = 'https://script.google.com/macros/s/AKfycbTEST_id-123/exec';
+/** Made up for the tests. Not the real passcode. */
+const ADMIN = 'unit-test-admin-passcode-0123';
 const IG_UA =
   'Mozilla/5.0 (iPhone; CPU iPhone OS 18_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/22F76 Instagram 385.0.0.29.74';
 
 /** A fetch that hands each request to Code.gs, as the deployed web app would. */
 function fetchInto(script: AppsScriptRun) {
   return vi.fn(async (_url: string | URL | Request, init?: RequestInit) => {
-    const answer = init?.method === 'POST' ? script.doPost(String(init.body)) : script.doGet();
+    const key = new URL(String(_url)).searchParams.get('key') ?? undefined;
+    const answer = init?.method === 'POST' ? script.doPost(String(init.body)) : script.doGet(key);
     return new Response(JSON.stringify(answer.json), { status: 200 });
   });
 }
@@ -22,7 +25,6 @@ function store(overrides: Partial<SheetStoreOptions> = {}): SheetVoteStore {
     contestants,
     window: votingWindow,
     rules: votingRules,
-    passcode: demo.passcode,
     userAgent: IG_UA,
     ...overrides,
   });
@@ -46,8 +48,17 @@ describe('the sheet store (test site)', () => {
     expect(() => store({ endpoint: 'http://127.0.0.1:4190/exec' })).not.toThrow();
   });
 
-  it('is always open, shows the TEST SITE banner and never lets a vote change', async () => {
-    const sheet = store({ fetch: vi.fn() });
+  it('production: no banner, and the configured window decides whether voting is open', async () => {
+    const at = (iso: string) => store({ fetch: vi.fn(), now: () => new Date(iso) });
+    expect(at('2026-10-26T10:00:00+08:00').isDemo).toBe(false);
+    expect((await at('2026-11-02T11:59:59+08:00').getSession()).state.status).toBe('not_open');
+    expect((await at('2026-11-02T12:00:00+08:00').getSession()).state.status).toBe('open');
+    expect((await at('2026-11-05T23:58:59+08:00').getSession()).state.status).toBe('open');
+    expect((await at('2026-11-05T23:59:00+08:00').getSession()).state.status).toBe('closed');
+  });
+
+  it('test mode: always open, shows the TEST SITE banner and never lets a vote change', async () => {
+    const sheet = store({ fetch: vi.fn(), testMode: true });
     const session = await sheet.getSession();
     expect(sheet.isDemo).toBe(true);
     expect(sheet.kind).toBe('sheet');
@@ -122,33 +133,42 @@ describe('the sheet store (test site)', () => {
   });
 
   it('builds the admin snapshot from the sheet, with no email in it', async () => {
-    const script = loadAppsScript();
+    const script = loadAppsScript({ adminKey: ADMIN });
     const sheet = store({ fetch: fetchInto(script) });
     await sheet.castVote('c07', 'alice@example.com', 'req-0001-aaaa');
     await sheet.castVote('c12', 'bob@example.com', 'req-0002-bbbb');
     await sheet.castVote('c07', 'carol@example.com', 'req-0003-cccc');
-    const snapshot = await sheet.adminGetSnapshot(demo.passcode);
+    const snapshot = await sheet.adminGetSnapshot(ADMIN);
     expect(snapshot.votes.map((v) => v.contestantId)).toEqual(['c07', 'c12', 'c07']);
     expect(snapshot.votes.every((v) => /^[0-9a-f]{8}$/.test(v.voterRef) && v.replacedAt === null)).toBe(true);
     expect(JSON.stringify(snapshot)).not.toMatch(/@example\.com/);
   });
 
-  it('keeps the admin view behind the passcode, and leaves the audit to the sheet', async () => {
-    const fetch = vi.fn();
+  it('the admin passcode is checked by the sheet, not the page; the demo passcode is refused', async () => {
+    const script = loadAppsScript({ adminKey: ADMIN });
+    const fetch = fetchInto(script);
     const sheet = store({ fetch });
     expect((await rejection(sheet.adminGetSnapshot('wrong'))).code).toBe('bad_passcode');
-    expect((await rejection(sheet.adminGetAudit(demo.passcode))).message).toMatch(/Google Sheet/);
-    expect((await rejection(sheet.adminSetStatus(demo.passcode))).code).toBe('misconfigured');
+    expect((await rejection(sheet.adminGetSnapshot('demo-admin'))).code).toBe('bad_passcode');
+    expect((await rejection(sheet.adminGetSnapshot(''))).code).toBe('bad_passcode');
+    expect((await sheet.adminGetSnapshot(ADMIN)).votes).toEqual([]);
+    expect((await rejection(sheet.adminGetAudit(ADMIN))).message).toMatch(/Google Sheet/);
+    expect((await rejection(sheet.adminSetStatus(ADMIN))).message).toMatch(/event\.config\.ts/);
+    expect((await rejection(sheet.adminSetStatus('wrong'))).code).toBe('bad_passcode');
+  });
+
+  it('never shows public counts: they would need the admin passcode', async () => {
+    const fetch = vi.fn();
+    const session = await store({ fetch, rules: { ...votingRules, publicCounts: true } }).getSession();
+    expect(session.tallies).toBeNull();
     expect(fetch).not.toHaveBeenCalled();
   });
 
-  it('fetches public counts from the sheet only when they are switched on', async () => {
-    const script = loadAppsScript();
-    const sheet = store({ fetch: fetchInto(script), rules: { ...votingRules, publicCounts: true } });
-    await sheet.castVote('c07', 'alice@example.com', 'req-0001-aaaa');
-    const session = await sheet.getSession();
-    expect(session.tallies?.find((t) => t.contestantId === 'c07')?.votes).toBe(1);
-    expect(session.tallies).toHaveLength(contestants.length);
+  it('reports the sheet refusing a vote outside the window', async () => {
+    const early = loadAppsScript({ window: { opensAt: '2099-01-01T00:00:00Z', closesAt: '2099-01-02T00:00:00Z' } });
+    expect((await rejection(store({ fetch: fetchInto(early) }).castVote('c07', 'a@example.com', 'req-0001-aaaa'))).code).toBe('voting_not_open');
+    const late = loadAppsScript({ window: { opensAt: '2000-01-01T00:00:00Z', closesAt: '2000-01-02T00:00:00Z' } });
+    expect((await rejection(store({ fetch: fetchInto(late) }).castVote('c07', 'a@example.com', 'req-0001-aaaa'))).code).toBe('voting_closed');
   });
 });
 

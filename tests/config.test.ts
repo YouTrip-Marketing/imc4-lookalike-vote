@@ -28,8 +28,8 @@ describe('event.config.ts', () => {
     expect(votingRules).toEqual({ allowVoteChange: false, publicCounts: false });
   });
 
-  it('keeps the legal-review switch on until legal clears the wording', () => {
-    expect(event.legalReviewPending).toBe(true);
+  it('has the legal gate cleared (Legal, IMC 4 Overview tab, 26 Oct 2026)', () => {
+    expect(event.legalReviewPending).toBe(false);
   });
 
   it('has a voting window written in Singapore time that opens before it closes', () => {
@@ -88,12 +88,12 @@ describe('event.config.ts', () => {
     expect(sharedAddressRule.votes).toBeGreaterThanOrEqual(2);
   });
 
-  it('points the promo banner at the supplied creatives (3:1 and 16:9 phone), with the agreed alt text and no link yet', () => {
+  it('points the promo banner at the supplied creatives (3:1 and 16:9 phone), with the agreed alt text and the blog link', () => {
     expect(promoBanner).toEqual({
       image: 'promo/imc4-100-flights-korea-banner-1920x640.jpg',
       phoneImage: 'promo/imc4-100-flights-korea-banner-1080x608.jpg',
       alt: '100 free flights to Korea. Sign up for YouTrip with FLY100KR, 28 Oct to 31 Dec. T&Cs apply.',
-      href: '',
+      href: 'https://www.you.co/sg/blog/100-flights-to-korea/',
     });
     expect(existsSync(resolve(import.meta.dirname, '..', 'public', promoBanner.image ?? ''))).toBe(true);
     expect(existsSync(resolve(import.meta.dirname, '..', 'public', promoBanner.phoneImage ?? ''))).toBe(true);

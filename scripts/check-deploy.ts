@@ -8,7 +8,8 @@
  * its demo admin passcode, as if it were the real voting page.
  */
 import { execFileSync } from 'node:child_process';
-import { existsSync, realpathSync, statSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { existsSync, readFileSync, realpathSync, statSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { loadEnv } from 'vite';
@@ -70,6 +71,69 @@ export function checkRepository(facts: RepositoryFacts): string[] {
   return [];
 }
 
+/** What the deploy check needs to know about apps-script/Code.gs (the sheet receiver). */
+export interface CodeGsFacts {
+  adminKeySha256: string;
+  opensAt: string;
+  closesAt: string;
+  sheetId: string;
+}
+
+/** Read-only: pulls four constants out of Code.gs. */
+export function readCodeGsFacts(path: string): CodeGsFacts | null {
+  if (!existsSync(path)) return null;
+  const source = readFileSync(path, 'utf8');
+  const constant = (name: string): string => new RegExp(`^var ${name} = '([^']*)';`, 'm').exec(source)?.[1] ?? '';
+  return {
+    adminKeySha256: constant('ADMIN_KEY_SHA256'),
+    opensAt: constant('OPENS_AT'),
+    closesAt: constant('CLOSES_AT'),
+    sheetId: constant('SHEET_ID'),
+  };
+}
+
+const SHEET_ENDPOINT = /^https:\/\/script\.google\.com\/macros\/s\/[A-Za-z0-9_-]+\/exec$/;
+const DEMO_PASSCODE_SHA256 = createHash('sha256').update('demo-admin', 'utf8').digest('hex');
+
+/**
+ * The Google Sheet store (production from 26 Oct 2026). Publishable only when
+ * every one of these holds; otherwise each failure is a problem, not a warning.
+ */
+function checkSheetBuild(
+  env: Readonly<Record<string, string | undefined>>,
+  config: { votingWindow: { opensAt: string | null; closesAt: string | null }; promoBanner?: { href?: string } },
+  codeGs: CodeGsFacts | null | undefined,
+): string[] {
+  const problems: string[] = [];
+  if (!SHEET_ENDPOINT.test((env.VITE_SHEET_ENDPOINT ?? '').trim())) {
+    problems.push(
+      'VITE_SHEET_ENDPOINT must be the Apps Script web app address, https://script.google.com/macros/s/<id>/exec.',
+    );
+  }
+  if (!/^https:\/\//i.test((config.promoBanner?.href ?? '').trim())) {
+    problems.push('promoBanner.href is not set to an https:// address (the blog post the pop-up links to).');
+  }
+  if (codeGs === undefined) return problems;
+  if (codeGs === null) {
+    problems.push('apps-script/Code.gs is missing. It is the vote store for a sheet build.');
+    return problems;
+  }
+  if (!/^[0-9a-f]{64}$/.test(codeGs.adminKeySha256)) {
+    problems.push('Code.gs has no admin passcode hash (ADMIN_KEY_SHA256). The tally would be unreadable.');
+  } else if (codeGs.adminKeySha256 === DEMO_PASSCODE_SHA256) {
+    problems.push('Code.gs uses the DEMO admin passcode. Set a real one.');
+  }
+  if (codeGs.sheetId === '') problems.push('Code.gs has no SHEET_ID.');
+  const same = (a: string, b: string | null): boolean => b !== null && Date.parse(a) === Date.parse(b);
+  if (!same(codeGs.opensAt, config.votingWindow.opensAt) || !same(codeGs.closesAt, config.votingWindow.closesAt)) {
+    problems.push(
+      'The voting window in Code.gs (OPENS_AT, CLOSES_AT) does not match votingWindow in event.config.ts. ' +
+        'The page and the sheet would disagree about when voting is open.',
+    );
+  }
+  return problems;
+}
+
 /** The key visual spec's size limit (developer/outbox/imc4-voting-site-key-visual-spec.md). */
 export const KEY_VISUAL_MAX_BYTES = 250 * 1024;
 
@@ -79,30 +143,30 @@ export function checkDeploy(
   repository?: RepositoryFacts,
   /** Where the key visual files should be. Checked only when given. */
   publicDir?: string,
+  /** apps-script/Code.gs, for a sheet build. Checked only when given. */
+  codeGs?: CodeGsFacts | null,
 ): DeployCheck {
   const problems: string[] = repository === undefined ? [] : checkRepository(repository);
   const warnings: string[] = [];
 
-  if (env.VITE_STORAGE_ADAPTER === 'sheet') {
-    // The Google Sheet test build is treated exactly like the demo: never the real page.
+  const adapter = env.VITE_STORAGE_ADAPTER;
+  if (env.VITE_TEST_DEPLOY === '1') {
     problems.push(
-      'VITE_STORAGE_ADAPTER is "sheet": a TEST build that writes votes, with readable emails, to a ' +
-        'Google Sheet. Voting is always open in it and its admin passcode is the demo one. ' +
-        'It is not the real voting page and must never be published as one. Set "api" in .env.production.',
-    );
-  } else if (env.VITE_STORAGE_ADAPTER !== 'api') {
-    problems.push(
-      'VITE_STORAGE_ADAPTER is not "api". This build would publish the DEMO. Set it in .env.production.',
+      'VITE_TEST_DEPLOY is 1: this is the TEST SITE build, with its banner. Unset it for the real page.',
     );
   }
-  if ((env.VITE_SHEET_ENDPOINT ?? '').trim() !== '') {
+  if (adapter === 'sheet') {
+    problems.push(...checkSheetBuild(env, config, codeGs));
+  } else if (adapter !== 'api') {
     problems.push(
-      'VITE_SHEET_ENDPOINT is set. That is the TEST Google Sheet; remove it from the production build.',
+      'VITE_STORAGE_ADAPTER is not "api" or "sheet". This build would publish the DEMO. Set it in .env.production.',
     );
+  } else if ((env.VITE_SHEET_ENDPOINT ?? '').trim() !== '') {
+    problems.push('VITE_SHEET_ENDPOINT is set in an "api" build. Remove it, or build with VITE_STORAGE_ADAPTER=sheet.');
   }
 
   const base = env.VITE_API_BASE_URL ?? '';
-  if (!/^https:\/\/[^/]+\/.+/.test(base)) {
+  if (adapter === 'api' && !/^https:\/\/[^/]+\/.+/.test(base)) {
     problems.push(
       'VITE_API_BASE_URL must be the full https address of the vote API, ' +
         'e.g. https://<project>.supabase.co/functions/v1/vote-api. ' +
@@ -186,6 +250,7 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
     undefined,
     readRepositoryFacts(root),
     resolve(root, 'public'),
+    readCodeGsFacts(resolve(root, 'apps-script', 'Code.gs')),
   );
   for (const warning of result.warnings) console.warn(`Warning: ${warning}`);
   if (!result.ok) {

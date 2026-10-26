@@ -5,7 +5,8 @@ import { keyVisual } from '../../event.config';
  * `api` (production) build the placeholder below is dead code and is removed.
  * The public must never see a placeholder.
  */
-const SHOW_PLACEHOLDER = import.meta.env.VITE_STORAGE_ADAPTER !== 'api';
+const SHOW_PLACEHOLDER =
+  import.meta.env.VITE_STORAGE_ADAPTER !== 'api' && import.meta.env.VITE_STORAGE_ADAPTER !== 'sheet';
 
 /** From this width the optional desktop image is used. Matches the 4-column breakpoint. */
 const DESKTOP_QUERY = '(min-width: 900px)';

@@ -11,7 +11,7 @@
  */
 import { randomUUID } from 'node:crypto';
 import { createServer, type Server } from 'node:http';
-import { loadAppsScript, type AppsScriptRun } from './apps-script-harness';
+import { loadAppsScript, type AppsScriptOptions, type AppsScriptRun } from './apps-script-harness';
 
 export const STUB_IP = '203.0.113.5';
 
@@ -22,8 +22,8 @@ export interface SheetStubServer {
   close: () => Promise<void>;
 }
 
-export async function startSheetStubServer(port: number): Promise<SheetStubServer> {
-  const script = loadAppsScript();
+export async function startSheetStubServer(port: number, options: AppsScriptOptions = {}): Promise<SheetStubServer> {
+  const script = loadAppsScript(options);
   const waiting = new Map<string, string>();
   let preflights = 0;
 
@@ -60,7 +60,9 @@ export async function startSheetStubServer(port: number): Promise<SheetStubServe
     request.on('data', (chunk: Buffer) => chunks.push(chunk));
     request.on('end', () => {
       const answer =
-        request.method === 'POST' ? script.doPost(Buffer.concat(chunks).toString('utf8')) : script.doGet();
+        request.method === 'POST'
+          ? script.doPost(Buffer.concat(chunks).toString('utf8'))
+          : script.doGet(url.searchParams.get('key') ?? undefined);
       const id = randomUUID();
       waiting.set(id, JSON.stringify(answer.json));
       response.writeHead(302, { Location: `/echo?id=${id}`, 'Access-Control-Allow-Origin': '*' }).end();

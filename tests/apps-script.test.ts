@@ -1,6 +1,10 @@
+import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import { canonicalEmail, checkEmail } from '../src/domain/email';
-import { loadAppsScript } from '../scripts/apps-script-harness';
+import { codeGsConstant, loadAppsScript } from '../scripts/apps-script-harness';
+import { votingWindow } from '../event.config';
+
+const ADMIN = 'unit-test-admin-passcode-0123';
 
 /** Inputs the site's own email tests cover, plus edge cases for the copy in Code.gs. */
 const EMAILS = [
@@ -110,7 +114,7 @@ describe('Code.gs doPost', () => {
   it('refuses to write when pasted into a different spreadsheet', () => {
     const script = loadAppsScript({ sheetId: 'some-other-sheet' });
     expect(script.doPost(vote()).json).toEqual({ ok: false, error: 'misconfigured' });
-    expect(script.doGet().json).toEqual({ ok: false, error: 'misconfigured' });
+    expect(script.doGet().json).toEqual({ ok: false, error: 'bad_passcode' });
     expect(script.votes()).toBeUndefined();
   });
 
@@ -157,11 +161,11 @@ describe('Code.gs doPost', () => {
 
 describe('Code.gs doGet', () => {
   it('lists counted votes without any email or IP, leaving refused repeats out', () => {
-    const script = loadAppsScript({ now: () => new Date('2026-10-13T06:30:00Z') });
+    const script = loadAppsScript({ now: () => new Date('2026-10-13T06:30:00Z'), adminKey: ADMIN });
     script.doPost(vote({ email: 'alice@example.com', voteId: 'vote-0001-aaaa' }));
     script.doPost(vote({ email: 'alice@example.com', voteId: 'vote-0009-dupe', contestantNumber: 5 }));
     script.doPost(vote({ email: 'bob@example.com', voteId: 'vote-0002-bbbb', contestantNumber: 12 }));
-    const answer = script.doGet().json as { ok: boolean; data: { votes: Record<string, unknown>[] } };
+    const answer = script.doGet(ADMIN).json as { ok: boolean; data: { votes: Record<string, unknown>[] } };
     expect(answer.ok).toBe(true);
     expect(answer.data.votes.map(({ n, no, at }) => ({ n, no, at }))).toEqual([
       { n: 1, no: 7, at: '2026-10-13T06:30:00.000Z' },
@@ -174,7 +178,52 @@ describe('Code.gs doGet', () => {
   });
 
   it('answers an empty list before the first vote', () => {
-    const script = loadAppsScript();
-    expect((script.doGet().json as { data: { votes: unknown[] } }).data.votes).toEqual([]);
+    const script = loadAppsScript({ adminKey: ADMIN });
+    expect((script.doGet(ADMIN).json as { data: { votes: unknown[] } }).data.votes).toEqual([]);
+  });
+});
+
+describe('Code.gs production rules (26 Oct 2026)', () => {
+  it('has the same voting window as event.config.ts', () => {
+    expect(Date.parse(codeGsConstant('OPENS_AT'))).toBe(Date.parse(votingWindow.opensAt ?? ''));
+    expect(Date.parse(codeGsConstant('CLOSES_AT'))).toBe(Date.parse(votingWindow.closesAt ?? ''));
+  });
+
+  it('holds a real admin passcode hash, not the demo one', () => {
+    const hash = codeGsConstant('ADMIN_KEY_SHA256');
+    expect(hash).toMatch(/^[0-9a-f]{64}$/);
+    expect(hash).not.toBe(createHash('sha256').update('demo-admin').digest('hex'));
+  });
+
+  const window = { opensAt: '2026-11-02T12:00:00+08:00', closesAt: '2026-11-05T23:59:00+08:00' };
+  it.each([
+    ['2026-11-02T11:59:59+08:00', { ok: false, error: 'voting_not_open' }],
+    ['2026-11-05T23:59:00+08:00', { ok: false, error: 'voting_closed' }],
+  ])('refuses a vote at %s, and writes nothing', (at, expected) => {
+    const script = loadAppsScript({ now: () => new Date(at), window, adminKey: ADMIN });
+    expect(script.doPost(vote()).json).toEqual(expected);
+    expect(script.votes()).toBeUndefined();
+  });
+
+  it('counts a vote at the opening minute and the last second', () => {
+    for (const at of ['2026-11-02T12:00:00+08:00', '2026-11-05T23:58:59+08:00']) {
+      const script = loadAppsScript({ now: () => new Date(at), window });
+      expect((script.doPost(vote()).json as { ok: boolean }).ok).toBe(true);
+    }
+  });
+
+  it('accepts an organiser test vote outside the window only with the admin passcode', () => {
+    const early = () => loadAppsScript({ now: () => new Date('2026-10-26T10:00:00+08:00'), window, adminKey: ADMIN });
+    expect(early().doPost(vote({ adminKey: 'wrong' })).json).toEqual({ ok: false, error: 'voting_not_open' });
+    expect(early().doPost(vote({ adminKey: 'demo-admin' })).json).toEqual({ ok: false, error: 'voting_not_open' });
+    expect((early().doPost(vote({ adminKey: ADMIN })).json as { ok: boolean }).ok).toBe(true);
+  });
+
+  it('keeps the tally behind the admin passcode', () => {
+    const script = loadAppsScript({ adminKey: ADMIN });
+    for (const key of [undefined, '', 'wrong', 'demo-admin']) {
+      expect(script.doGet(key).json).toEqual({ ok: false, error: 'bad_passcode' });
+    }
+    expect((script.doGet(ADMIN).json as { ok: boolean }).ok).toBe(true);
   });
 });

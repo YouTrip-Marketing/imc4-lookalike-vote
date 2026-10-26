@@ -1,13 +1,13 @@
 /**
- * IMC 4 lookalike vote: TEST SITE receiver for a Google Sheet.
+ * IMC 4 lookalike vote: the vote store, a Google Sheet (production from 26 Oct 2026).
  *
  * Paste this whole file into the sheet's Extensions > Apps Script editor and
  * deploy it as a web app (README, "Test votes into a Google Sheet"). The test
  * build of the voting page (VITE_STORAGE_ADAPTER=sheet) then POSTs every vote
  * here, and each vote becomes one row on the "Votes" tab.
  *
- * FOR TESTING ONLY. The real vote runs on the Supabase API (README, "Deploy").
- * This sheet holds each voter's email in readable form.
+ * The sheet holds each voter's email in readable form, for the organisers'
+ * confidential audit only (Kelicia's decision, 29 Sep 2026). Keep it private.
  *
  * What it does
  *   doPost  one attempt in, one row out. One vote per email, counted the same
@@ -21,7 +21,16 @@
  *           answered with the first answer and never adds a second row.
  *   doGet   every counted vote without emails or IPs: row number, contestant
  *           number, time and a short reference made from the counted email.
- *           The admin page at #/admin builds its tally from this.
+ *           The admin page at #/admin builds its tally from this. Needs the
+ *           admin passcode (?key=...), checked against ADMIN_KEY_SHA256 below,
+ *           so running totals are not public.
+ *
+ * Voting window, enforced here whatever the page says: a vote before OPENS_AT
+ * is refused with voting_not_open, from CLOSES_AT on with voting_closed. Both
+ * must match votingWindow in event.config.ts (a unit test checks). One
+ * exception: a POST carrying the admin passcode as adminKey is accepted outside
+ * the window, so the organisers can cast a test vote before launch (and delete
+ * its row). The page never sends adminKey.
  *
  * IP (self-reported): Apps Script cannot see the voter's IP address, so the
  * page looks up its own public IP and sends it. INDICATIVE ONLY: anyone can
@@ -34,6 +43,11 @@
 /** The one spreadsheet this script may write to: "Jkook lookalike contest voting site". */
 var SHEET_ID = '1nq_hyBZWk5zbTLuigdTyThQLf94mxaSr_Z3IklOcGEE';
 var VOTES_TAB = 'Votes';
+/** Same instants as votingWindow in event.config.ts. */
+var OPENS_AT = '2026-11-02T12:00:00+08:00';
+var CLOSES_AT = '2026-11-05T23:59:00+08:00';
+/** SHA-256 (hex) of the admin passcode. The passcode itself is never in this file. */
+var ADMIN_KEY_SHA256 = '0025f030d4ebb2462d18c614e97cd3ff9a4b2cf61b54f61968bf33385d0e1661';
 var CONTESTANT_COUNT = 20;
 var TIME_ZONE = 'Asia/Singapore';
 var HEADER = [
@@ -118,6 +132,12 @@ function doPost(e) {
   var counted = canonicalEmail(vote.email);
   if (counted === null) return reply_({ ok: false, error: 'invalid_email' });
 
+  if (!isAdmin_(vote.adminKey)) {
+    var now0 = new Date().getTime();
+    if (now0 < new Date(OPENS_AT).getTime()) return reply_({ ok: false, error: 'voting_not_open' });
+    if (now0 >= new Date(CLOSES_AT).getTime()) return reply_({ ok: false, error: 'voting_closed' });
+  }
+
   var lock = LockService.getScriptLock();
   if (!lock.tryLock(10000)) return reply_({ ok: false, error: 'busy' });
   try {
@@ -163,7 +183,8 @@ function doPost(e) {
   }
 }
 
-function doGet() {
+function doGet(e) {
+  if (!isAdmin_(e && e.parameter ? e.parameter.key : undefined)) return reply_({ ok: false, error: 'bad_passcode' });
   var sheet = votesSheet_();
   if (sheet === null) return reply_({ ok: false, error: 'misconfigured' });
   var rows = readRows_(sheet);
@@ -237,6 +258,22 @@ function shortRef_(counted) {
   var bytes = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, counted, Utilities.Charset.UTF_8);
   var hex = '';
   for (var i = 0; i < 4; i += 1) {
+    var b = bytes[i] < 0 ? bytes[i] + 256 : bytes[i];
+    hex += (b < 16 ? '0' : '') + b.toString(16);
+  }
+  return hex;
+}
+
+/** True when `key` is the admin passcode. Constant-time enough for a hash compare. */
+function isAdmin_(key) {
+  if (typeof key !== 'string' || key === '' || !/^[0-9a-f]{64}$/.test(ADMIN_KEY_SHA256)) return false;
+  return sha256Hex_(key) === ADMIN_KEY_SHA256;
+}
+
+function sha256Hex_(value) {
+  var bytes = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, value, Utilities.Charset.UTF_8);
+  var hex = '';
+  for (var i = 0; i < bytes.length; i += 1) {
     var b = bytes[i] < 0 ? bytes[i] + 256 : bytes[i];
     hex += (b < 16 ? '0' : '') + b.toString(16);
   }

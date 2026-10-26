@@ -1,5 +1,7 @@
 node_modules/
 dist/
+# Production build for YouTrip-Marketing/imc4-lookalike-vote (own nested git repo, gh-pages).
+dist-prod/
 .env
 .env.local
 .env.*.local

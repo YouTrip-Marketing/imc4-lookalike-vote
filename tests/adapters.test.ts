@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 /**
  * The platform adapters: Supabase Edge Function and Netlify Function.
  *
@@ -18,7 +19,7 @@ import type { PGlite } from '@electric-sql/pglite';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { contestants, demo, event, keyVisual, promoBanner, votingWindow } from '../event.config';
 import { buildEdgeFunction } from '../scripts/build-edge-function';
-import { KEY_VISUAL_MAX_BYTES, checkDeploy, checkRepository, readRepositoryFacts } from '../scripts/check-deploy';
+import { KEY_VISUAL_MAX_BYTES, checkDeploy, checkRepository, readCodeGsFacts, readRepositoryFacts } from '../scripts/check-deploy';
 import { createLocalDatabase, createPgliteDatabase } from '../scripts/local-api-server';
 import type { RpcName } from '../server/database';
 import { CONTESTANT_IDS, ONE_VOTE, requestId } from './fixtures';
@@ -367,21 +368,70 @@ describe('the deploy check', () => {
     }
   });
 
-  it('refuses the Google Sheet test build as loudly as the demo', () => {
-    const result = checkDeploy({
-      ...ready,
+  describe('Google Sheet store (production from 26 Oct 2026)', () => {
+    const sheetEnv = {
       VITE_STORAGE_ADAPTER: 'sheet',
-      VITE_SHEET_ENDPOINT: 'https://script.google.com/macros/s/abc/exec',
+      VITE_SHEET_ENDPOINT: 'https://script.google.com/macros/s/AKfycbAbc_123-x/exec',
+    };
+    const goodCodeGs = {
+      adminKeySha256: 'a'.repeat(64),
+      opensAt: votingWindow.opensAt ?? '',
+      closesAt: votingWindow.closesAt ?? '',
+      sheetId: 'sheet-id',
+    };
+    const cfg = (overrides: Record<string, unknown> = {}) => ({
+      contestants,
+      event: { ...event, legalReviewPending: false },
+      votingWindow,
+      keyVisual,
+      promoBanner: { ...promoBanner, href: 'https://www.you.co/sg/blog/100-flights-to-korea/' },
+      ...overrides,
     });
-    expect(result.ok).toBe(false);
-    expect(result.problems.join(' ')).toMatch(/TEST build/);
-    expect(result.problems.join(' ')).toMatch(/must never be published/);
-  });
+    const problems = (env: Record<string, string | undefined>, config = cfg(), codeGs: unknown = goodCodeGs): string =>
+      checkDeploy(env, config as Parameters<typeof checkDeploy>[1], undefined, undefined, codeGs as never).problems.join(' ');
 
-  it('refuses a production build that still carries the test sheet address', () => {
-    const result = checkDeploy({ ...ready, VITE_SHEET_ENDPOINT: 'https://script.google.com/macros/s/abc/exec' });
-    expect(result.ok).toBe(false);
-    expect(result.problems.join(' ')).toMatch(/VITE_SHEET_ENDPOINT/);
+    it('passes when every production condition holds', () => {
+      expect(problems(sheetEnv)).toBe('');
+    });
+
+    it('refuses the TEST SITE build', () => {
+      expect(problems({ ...sheetEnv, VITE_TEST_DEPLOY: '1' })).toMatch(/TEST SITE build/);
+    });
+
+    it.each(['', 'https://example.com/exec', 'https://script.google.com/macros/s/abc/dev', 'http://script.google.com/macros/s/abc/exec'])(
+      'refuses a sheet address of "%s"',
+      (endpoint) => {
+        expect(problems({ ...sheetEnv, VITE_SHEET_ENDPOINT: endpoint })).toMatch(/VITE_SHEET_ENDPOINT/);
+      },
+    );
+
+    it('refuses while legal review is pending', () => {
+      expect(problems(sheetEnv, cfg({ event: { ...event, legalReviewPending: true } }))).toMatch(/legalReviewPending/);
+    });
+
+    it('refuses without the blog link on the promo', () => {
+      expect(problems(sheetEnv, cfg({ promoBanner: { ...promoBanner, href: '' } }))).toMatch(/promoBanner\.href/);
+    });
+
+    it('refuses without a real admin passcode in Code.gs', () => {
+      expect(problems(sheetEnv, cfg(), { ...goodCodeGs, adminKeySha256: 'NOT-SET' })).toMatch(/admin passcode hash/);
+      const demoHash = createHash('sha256').update('demo-admin').digest('hex');
+      expect(problems(sheetEnv, cfg(), { ...goodCodeGs, adminKeySha256: demoHash })).toMatch(/DEMO admin passcode/);
+    });
+
+    it('refuses when Code.gs and event.config.ts disagree on the window, or Code.gs is missing', () => {
+      expect(problems(sheetEnv, cfg(), { ...goodCodeGs, closesAt: '2026-11-06T23:59:00+08:00' })).toMatch(/does not match/);
+      expect(problems(sheetEnv, cfg(), null)).toMatch(/Code\.gs is missing/);
+    });
+
+    it('the real Code.gs and config pass the sheet checks today (the address aside)', () => {
+      const real = readCodeGsFacts(resolve(import.meta.dirname, '..', 'apps-script', 'Code.gs'));
+      expect(problems(sheetEnv, cfg({ event, promoBanner }), real)).toBe('');
+    });
+
+    it('an api build carrying a sheet address is refused', () => {
+      expect(checkDeploy({ ...ready, VITE_SHEET_ENDPOINT: sheetEnv.VITE_SHEET_ENDPOINT }).problems.join(' ')).toMatch(/VITE_SHEET_ENDPOINT/);
+    });
   });
 
   it.each([undefined, '', '/api', 'http://project-ref.supabase.co/functions/v1/vote-api', 'https://host'])(
@@ -394,7 +444,10 @@ describe('the deploy check', () => {
   );
 
   it('refuses while the wording is pending legal review', () => {
-    const result = checkDeploy({ ...ready, ALLOW_PENDING_LEGAL: undefined });
+    const result = checkDeploy(
+      { ...ready, ALLOW_PENDING_LEGAL: undefined },
+      { contestants, event: { ...event, legalReviewPending: true }, votingWindow, keyVisual, promoBanner },
+    );
     expect(result.ok).toBe(false);
     expect(result.problems.join(' ')).toMatch(/legalReviewPending/);
     // Revision 5: the legal gate now covers the T&Cs on collecting email and IP.
@@ -472,11 +525,15 @@ describe('the deploy check', () => {
     const text = (promo: Partial<typeof promoBanner>, publicDir?: string): string =>
       checkDeploy(ready, withPromo(promo), undefined, publicDir).warnings.join(' ');
 
-    it('as configured today: warns only that there is no link, and never blocks', () => {
+    it('as configured today: links to the blog, so no promo warning, and never blocks', () => {
       const result = checkDeploy(ready, withPromo({}));
       expect(result.ok).toBe(true);
-      expect(result.warnings.join(' ')).toMatch(/promo banner has no link/);
+      expect(result.warnings.join(' ')).not.toMatch(/promo banner has no link/);
       expect(result.warnings.join(' ')).not.toMatch(/no phone version/);
+    });
+
+    it('warns when there is no link', () => {
+      expect(text({ href: '' })).toMatch(/promo banner has no link/);
     });
 
     it('warns when there is no phone version', () => {

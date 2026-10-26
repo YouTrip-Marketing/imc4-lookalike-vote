@@ -54,6 +54,14 @@ const SITE_PORT_NO_KV = 4182;
 const SITE_PORT_PROD_NO_KV = 4183;
 const SITE_PORT_SHEET = 4184;
 const SHEET_STUB_PORT = 4190;
+const SITE_PORT_SHEET_PROD = 4185;
+const SITE_PORT_SHEET_PROD_OPEN = 4186;
+const SHEET_STUB_PROD_PORT = 4191;
+const SHEET_STUB_PROD_OPEN_PORT = 4192;
+/** Made up for the e2e stand-in sheets. Not the real admin passcode. */
+const SHEET_ADMIN = 'e2e-sheet-admin-passcode-not-real';
+/** GitHub Pages serves the production site under this folder. */
+const PAGES_BASE = '/imc4-lookalike-vote/';
 const API_PORT = 54329;
 const PROD_PASSCODE = 'e2e-admin-passcode-not-a-secret';
 const PROD_HASH_SECRET = 'e2e-hash-secret-not-a-secret-0123456789';
@@ -600,9 +608,10 @@ async function measureVotedScreen(page: Page, hideDemoBanner: boolean): Promise<
 
 const votedScreens: Record<string, VotedScreen> = {};
 
-async function serve(outDir: string, port: number): Promise<PreviewServer> {
+async function serve(outDir: string, port: number, base = '/'): Promise<PreviewServer> {
   return preview({
     root: ROOT,
+    base,
     logLevel: 'error',
     build: { outDir },
     preview: { port, strictPort: true, host: '127.0.0.1' },
@@ -680,7 +689,7 @@ async function partC(
 
   await step('sheet build: #/admin counts only the 2 counted votes, with no emails or IPs on screen', async () => {
     const admin = await open(await browser.createBrowserContext(), `${site}/#/admin`, { viewport: LAPTOP });
-    await unlockAdmin(admin, demo.passcode);
+    await unlockAdmin(admin, SHEET_ADMIN);
     await votesCounted(admin, 2);
     const body = await text(admin);
     assert.equal(/@example\.com|@gmail\.com/i.test(body), false, 'an email address is on the admin screen');
@@ -701,6 +710,111 @@ async function partC(
       .map((file) => readFileSync(file, 'utf8'))
       .join('\n');
     assert.equal(/ipify|VITE_SHEET_ENDPOINT|script\.google\.com/.test(production), false, 'sheet code is in the production bundle');
+  });
+
+  await context.close();
+}
+
+
+// ------------------------------------------------------------------ Part D
+
+async function bundleOf(dir: string): Promise<string> {
+  return filesUnder(dir)
+    .filter((file) => file.endsWith('.js') || file.endsWith('.html'))
+    .map((file) => readFileSync(file, 'utf8'))
+    .join('\n');
+}
+
+/**
+ * PRODUCTION Google Sheet build (26 Oct 2026), served under /imc4-lookalike-vote/
+ * as GitHub Pages will. First with the real config (before the window: nothing
+ * can be cast), then with a stand-in config whose window is open now.
+ */
+async function partD(
+  browser: Browser,
+  closedSite: string,
+  closedStub: SheetStubServer,
+  closedDir: string,
+  openSite: string,
+  openStub: SheetStubServer,
+): Promise<void> {
+  await step('production sheet build: no TEST or DEMO banner, real window, nothing votable before 2 Nov', async () => {
+    const page = await open(await browser.createBrowserContext(), `${closedSite}${PAGES_BASE}`);
+    await see(page, 'Voting opens soon');
+    await see(page, `Voting opens ${formatSgtDateTime(votingWindow.opensAt)}.`);
+    const body = await text(page);
+    assert.equal(/TEST SITE|DEMO DATA|Demo controls/.test(body), false, 'a test/demo banner is on the production page');
+    assert.equal(await page.$('.demo-banner'), null);
+    assert.equal(await cardsDisabled(page), true);
+    // Not open: the promo sits at the bottom (Revision 10), linking to the blog.
+    await checkPromo(page, 'bottom');
+    await shot(page, 'prod-sheet-390-1-before-window');
+    await page.close();
+  });
+
+  await step('production sheet build: the sheet itself refuses a vote before the window', async () => {
+    const response = await fetch(`${closedStub.url}/exec`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ contestantNumber: 7, contestantName: 'Contestant 7', email: 'early@example.com', voteId: 'early-0001-aaaa', device: 'x', ip: 'unavailable' }),
+    });
+    assert.deepEqual(await response.json(), { ok: false, error: 'voting_not_open' });
+    assert.equal(closedStub.script.votes(), undefined, 'a row was written before the window');
+  });
+
+  await step('production sheet build: no demo passcode, demo panels, demo store or placeholder in the bundle', async () => {
+    const bundle = await bundleOf(closedDir);
+    // The banner wording lives in shared page code and is checked on screen above;
+    // these are the things that must not ship at all.
+    // 'imc4-voting-demo-v3' is the demo store's storage key: present only if the demo store shipped.
+    assert.equal(filesUnder(closedDir).some((file) => /demoStore|Demo(Voter|Admin)Panel/.test(file)), false, 'a demo chunk shipped');
+    for (const leak of ['demo-admin', 'Demo controls', 'Key visual goes here', 'imc4-voting-demo-v3', SHEET_ADMIN]) {
+      assert.equal(bundle.includes(leak), false, `"${leak}" is in the production sheet bundle`);
+    }
+    assert.ok(bundle.includes(`${closedStub.url}/exec`));
+  });
+
+  await step('production sheet build: admin refuses the demo passcode and unlocks with the real one', async () => {
+    const admin = await open(await browser.createBrowserContext(), `${closedSite}${PAGES_BASE}#/admin`, { viewport: LAPTOP });
+    await admin.waitForSelector('#passcode');
+    await admin.type('#passcode', 'demo-admin');
+    await press(admin, 'Unlock');
+    await see(admin, "That passcode isn't right.");
+    await admin.$eval('#passcode', (input) => (input as HTMLInputElement).select());
+    await admin.keyboard.press('Backspace');
+    await admin.type('#passcode', SHEET_ADMIN);
+    await press(admin, 'Unlock');
+    await see(admin, 'Tally and ranking');
+    await votesCounted(admin, 0);
+    await admin.close();
+  });
+
+  const context = await browser.createBrowserContext();
+  const voter = await open(context, `${openSite}${PAGES_BASE}`);
+
+  await step('production sheet build, window open: vote, pop-up links to the blog, row written', async () => {
+    await see(voter, OPEN_H1);
+    assert.equal(await voter.$('.demo-banner'), null);
+    await voteFor(voter, 7, 'Prod.Voter@Example.com');
+    await see(voter, 'Done. Your vote is counted.');
+    await checkPromo(voter, 'pop-up');
+    const href = await voter.$eval('dialog.sheet--promo .promo-banner', (node) => node.getAttribute('href'));
+    assert.equal(href, 'https://www.you.co/sg/blog/100-flights-to-korea/');
+    await shot(voter, 'prod-sheet-390-2-popup');
+    const rows = openStub.script.votes()?.rows.slice(1) ?? [];
+    assert.equal(rows.length, 1);
+    assert.deepEqual([rows[0]?.[2], rows[0]?.[4], rows[0]?.[8]], ['prod.voter@example.com', 7, false]);
+    await press(voter, 'Close', 'dialog.sheet--promo');
+    await shot(voter, 'prod-sheet-390-3-voted');
+  });
+
+  await step('production sheet build, window open: the same email again is refused and logged as a repeat', async () => {
+    const other = await open(await browser.createBrowserContext(), `${openSite}${PAGES_BASE}`);
+    await voteFor(other, 3, 'prod.voter@example.com');
+    await see(other, DUPLICATE);
+    const rows = openStub.script.votes()?.rows.slice(1) ?? [];
+    assert.deepEqual(rows.map((row) => row[8]), [false, true]);
+    await other.close();
   });
 
   await context.close();
@@ -1240,7 +1354,9 @@ async function checkPromo(
   const phone = options.phone ?? (await page.evaluate(() => window.innerWidth < 640));
   const wantRatio = phone ? 16 / 9 : 3;
   assert.ok(Math.abs(promo.ratio - wantRatio) < 0.02, `promo ratio ${promo.ratio}, expected ${wantRatio}`);
-  if (options.link === undefined) {
+  const standIn = options.link !== undefined;
+  const link = options.link ?? promoBanner.href ?? '';
+  if (!standIn) {
     const wantFile = phone ? promoBanner.phoneImage ?? '' : promoBanner.image ?? '';
     assert.ok(promo.src.endsWith(wantFile), `promo shows ${promo.src}, expected ${wantFile}`);
   } else {
@@ -1250,12 +1366,12 @@ async function checkPromo(
   assert.equal(promo.loading, expected === 'pop-up' ? 'eager' : 'lazy');
   assert.equal(promo.filter, 'none', 'the photo treatment must not reach the promo banner');
   assert.equal(promo.text, '', 'the promo banner must carry no text of its own');
-  if (options.link === undefined) {
+  if (link === '') {
     assert.equal(promo.tag, 'div', 'no link configured, so the banner must not be a link');
     assert.equal(promo.alt, promoBanner.alt);
   } else {
     assert.equal(promo.tag, 'a');
-    assert.equal(promo.href, options.link);
+    assert.equal(promo.href, link);
     assert.equal(promo.target, '_blank');
     assert.equal(promo.rel, 'noopener noreferrer');
   }
@@ -2007,6 +2123,8 @@ async function main(): Promise<void> {
   const servers: PreviewServer[] = [];
   let api: LocalApiServer | null = null;
   let sheetStub: SheetStubServer | null = null;
+  let sheetProdStub: SheetStubServer | null = null;
+  let sheetProdOpenStub: SheetStubServer | null = null;
 
   try {
     console.log('\nPart A: demo build, local adapter');
@@ -2079,19 +2197,59 @@ async function main(): Promise<void> {
     await partB(browser, prodSite, api, prodDir, demoSite);
 
     console.log('\nPart C: Google Sheet test build against a stand-in running apps-script/Code.gs');
-    sheetStub = await startSheetStubServer(SHEET_STUB_PORT);
+    sheetStub = await startSheetStubServer(SHEET_STUB_PORT, { adminKey: SHEET_ADMIN });
     const sheetDir = join(BUILDS, 'sheet');
     await buildSite(sheetDir, {
       VITE_STORAGE_ADAPTER: 'sheet',
       VITE_SHEET_ENDPOINT: `${sheetStub.url}/exec`,
       VITE_IP_LOOKUP_URL: `${sheetStub.url}/ip`,
+      VITE_TEST_DEPLOY: '1',
     });
     servers.push(await serve(sheetDir, SITE_PORT_SHEET));
     const sheetSite = `http://127.0.0.1:${SITE_PORT_SHEET}`;
     await partC(browser, sheetSite, sheetStub, sheetDir, prodDir);
 
+    console.log('\nPart D: PRODUCTION Google Sheet build under /imc4-lookalike-vote/ (real window, then an open stand-in window)');
+    sheetProdStub = await startSheetStubServer(SHEET_STUB_PROD_PORT, {
+      adminKey: SHEET_ADMIN,
+      window: { opensAt: votingWindow.opensAt ?? '', closesAt: votingWindow.closesAt ?? '' },
+    });
+    const sheetProdDir = join(BUILDS, 'sheet-prod');
+    await buildSite(sheetProdDir, {
+      VITE_STORAGE_ADAPTER: 'sheet',
+      VITE_SHEET_ENDPOINT: `${sheetProdStub.url}/exec`,
+      VITE_IP_LOOKUP_URL: `${sheetProdStub.url}/ip`,
+    });
+    servers.push(await serve(sheetProdDir, SITE_PORT_SHEET_PROD, PAGES_BASE));
+    const sheetProdSite = `http://127.0.0.1:${SITE_PORT_SHEET_PROD}`;
+
+    sheetProdOpenStub = await startSheetStubServer(SHEET_STUB_PROD_OPEN_PORT, { adminKey: SHEET_ADMIN });
+    const openWindowConfig = join(BUILDS, 'open-window-config.ts');
+    writeFileSync(
+      openWindowConfig,
+      `export * from ${JSON.stringify(REAL_CONFIG)};
+export const votingWindow = { opensAt: ${JSON.stringify(new Date(Date.now() - 3600_000).toISOString())}, closesAt: ${JSON.stringify(new Date(Date.now() + 3600_000).toISOString())}, autoOpen: true };
+`,
+    );
+    const sheetProdOpenDir = join(BUILDS, 'sheet-prod-open');
+    await buildSite(
+      sheetProdOpenDir,
+      {
+        VITE_STORAGE_ADAPTER: 'sheet',
+        VITE_SHEET_ENDPOINT: `${sheetProdOpenStub.url}/exec`,
+        VITE_IP_LOOKUP_URL: `${sheetProdOpenStub.url}/ip`,
+      },
+      [standInConfigPlugin(openWindowConfig)],
+    );
+    servers.push(await serve(sheetProdOpenDir, SITE_PORT_SHEET_PROD_OPEN, PAGES_BASE));
+    const sheetProdOpenSite = `http://127.0.0.1:${SITE_PORT_SHEET_PROD_OPEN}`;
+    await partD(browser, sheetProdSite, sheetProdStub, sheetProdDir, sheetProdOpenSite, sheetProdOpenStub);
+
     await step('no request left localhost: no trackers, fonts or third parties', async () => {
-      const allowed = new Set([demoSite, prodSite, kvSite, noKvSite, prodNoKvSite, sheetSite, sheetStub?.url, api?.url, 'null']);
+      const allowed = new Set([
+        demoSite, prodSite, kvSite, noKvSite, prodNoKvSite, sheetSite, sheetStub?.url,
+        sheetProdSite, sheetProdStub?.url, sheetProdOpenSite, sheetProdOpenStub?.url, api?.url, 'null',
+      ]);
       const foreign = [...requestsSeen].filter((origin) => !allowed.has(origin));
       assert.deepEqual(foreign, []);
       assert.equal(
@@ -2138,6 +2296,8 @@ async function main(): Promise<void> {
     }
     await api?.close();
     await sheetStub?.close();
+    await sheetProdStub?.close();
+    await sheetProdOpenStub?.close();
     rmSync(BUILDS, { recursive: true, force: true });
   }
 }

@@ -65,7 +65,7 @@ export class FakeSheet {
 
 export interface AppsScriptRun {
   doPost(body: string): { status: number; json: unknown };
-  doGet(): { status: number; json: unknown };
+  doGet(key?: string): { status: number; json: unknown };
   /** The Votes tab, or undefined before the first vote creates it. */
   votes(): FakeSheet | undefined;
   /** Simulates another request holding the script lock. */
@@ -77,7 +77,23 @@ export interface AppsScriptRun {
 /** The real sheet's ID, as set in Code.gs. */
 export const TEST_SHEET_ID = '1nq_hyBZWk5zbTLuigdTyThQLf94mxaSr_Z3IklOcGEE';
 
-export function loadAppsScript(options: { now?: () => Date; sheetId?: string } = {}): AppsScriptRun {
+export interface AppsScriptOptions {
+  now?: () => Date;
+  sheetId?: string;
+  /** Replaces OPENS_AT / CLOSES_AT in the loaded copy (tests need a window around "now"). */
+  window?: { opensAt: string; closesAt: string };
+  /** Replaces ADMIN_KEY_SHA256 in the loaded copy with the hash of this test passcode. */
+  adminKey?: string;
+}
+
+/** The real Code.gs constants, read from the file (for parity tests). */
+export function codeGsConstant(name: string): string {
+  const match = new RegExp(`^var ${name} = '([^']*)';`, 'm').exec(readFileSync(CODE_GS_PATH, 'utf8'));
+  if (match === null) throw new Error(`Code.gs has no constant ${name}`);
+  return match[1] ?? '';
+}
+
+export function loadAppsScript(options: AppsScriptOptions = {}): AppsScriptRun {
   const tabs = new Map<string, FakeSheet>();
   let lockHeld = false;
   const RealDate = Date;
@@ -142,7 +158,20 @@ export function loadAppsScript(options: { now?: () => Date; sheetId?: string } =
   };
 
   const context = createContext({ ...services });
-  runInContext(readFileSync(CODE_GS_PATH, 'utf8'), context, { filename: 'Code.gs' });
+  let source = readFileSync(CODE_GS_PATH, 'utf8');
+  // Unless a test says otherwise, voting is open around "now" in the stand-in.
+  const window = options.window ?? {
+    opensAt: new RealDate(now().getTime() - 3600_000).toISOString(),
+    closesAt: new RealDate(now().getTime() + 3600_000).toISOString(),
+  };
+  source = source
+    .replace(/^var OPENS_AT = '[^']*';/m, `var OPENS_AT = '${window.opensAt}';`)
+    .replace(/^var CLOSES_AT = '[^']*';/m, `var CLOSES_AT = '${window.closesAt}';`);
+  if (options.adminKey !== undefined) {
+    const hash = createHash('sha256').update(options.adminKey, 'utf8').digest('hex');
+    source = source.replace(/^var ADMIN_KEY_SHA256 = '[^']*';/m, `var ADMIN_KEY_SHA256 = '${hash}';`);
+  }
+  runInContext(source, context, { filename: 'Code.gs' });
   const fn = (name: string): ((...args: unknown[]) => unknown) => {
     const found = (context as Record<string, unknown>)[name];
     if (typeof found !== 'function') throw new Error(`Code.gs has no function ${name}`);
@@ -155,7 +184,7 @@ export function loadAppsScript(options: { now?: () => Date; sheetId?: string } =
 
   return {
     doPost: (body) => answer(fn('doPost')({ postData: { contents: body, type: 'text/plain' } })),
-    doGet: () => answer(fn('doGet')({ parameter: {} })),
+    doGet: (key?: string) => answer(fn('doGet')({ parameter: key === undefined ? {} : { key } })),
     votes: () => tabs.get('Votes'),
     holdLock: (held) => {
       lockHeld = held;

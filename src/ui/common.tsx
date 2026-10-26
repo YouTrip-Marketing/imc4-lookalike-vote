@@ -2,12 +2,8 @@ import { useEffect, useRef, type ReactNode } from 'react';
 import { event } from '../../event.config';
 import type { VotingStatus } from '../domain/types';
 
-/**
- * A build published for testing on real phones (VITE_TEST_DEPLOY=1), or any
- * build that sends votes to the test Google Sheet.
- */
-const TEST_DEPLOY =
-  import.meta.env.VITE_TEST_DEPLOY === '1' || import.meta.env.VITE_STORAGE_ADAPTER === 'sheet';
+/** A build published for testing on real phones (VITE_TEST_DEPLOY=1). */
+const TEST_DEPLOY = import.meta.env.VITE_TEST_DEPLOY === '1';
 
 export function DemoBanner(): JSX.Element {
   if (TEST_DEPLOY) {
