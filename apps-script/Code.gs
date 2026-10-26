@@ -249,8 +249,8 @@ function contestantsAnswer_(admin) {
 }
 
 function readContestants_() {
-  var book = SpreadsheetApp.getActiveSpreadsheet();
-  if (book === null || book.getId() !== SHEET_ID) return [];
+  var book = book_();
+  if (book === null) return [];
   var sheet = book.getSheetByName(CONTESTANTS_TAB);
   if (sheet === null || sheet.getLastRow() < 2) return [];
   var rows = sheet.getRange(2, 1, Math.min(sheet.getLastRow() - 1, 60), 5).getValues();
@@ -300,10 +300,23 @@ function photoAddress_(value) {
 
 // ---------------------------------------------------------------- helpers
 
-/** The Votes tab, or null when this script is attached to some other spreadsheet. */
+/**
+ * The "Voting site" spreadsheet, opened by its ID, so the script works wherever
+ * the Apps Script project lives (bound to the sheet or standalone), as long as
+ * the deploying account can edit the sheet. null if it cannot be opened.
+ */
+function book_() {
+  try {
+    return SpreadsheetApp.openById(SHEET_ID);
+  } catch (error) {
+    return null;
+  }
+}
+
+/** The Votes tab, or null when the spreadsheet cannot be opened. */
 function votesSheet_() {
-  var book = SpreadsheetApp.getActiveSpreadsheet();
-  if (book === null || book.getId() !== SHEET_ID) return null;
+  var book = book_();
+  if (book === null) return null;
   var sheet = book.getSheetByName(VOTES_TAB);
   if (sheet === null) {
     sheet = book.insertSheet(VOTES_TAB);

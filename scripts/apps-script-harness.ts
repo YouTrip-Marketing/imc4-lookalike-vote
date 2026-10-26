@@ -118,17 +118,24 @@ export function loadAppsScript(options: AppsScriptOptions = {}): AppsScriptRun {
     }
   }
 
+  const book = {
+    getId: () => options.sheetId ?? codeGsConstant('SHEET_ID'),
+    getSheetByName: (name: string) => tabs.get(name) ?? null,
+    insertSheet: (name: string) => {
+      const sheet = new FakeSheet();
+      tabs.set(name, sheet);
+      return sheet;
+    },
+  };
+
   const services = {
     SpreadsheetApp: {
-      getActiveSpreadsheet: () => ({
-        getId: () => options.sheetId ?? codeGsConstant('SHEET_ID'),
-        getSheetByName: (name: string) => tabs.get(name) ?? null,
-        insertSheet: (name: string) => {
-          const sheet = new FakeSheet();
-          tabs.set(name, sheet);
-          return sheet;
-        },
-      }),
+      // The script opens its sheet by ID. `sheetId` = the one spreadsheet this account can open.
+      openById: (id: string) => {
+        if (id !== (options.sheetId ?? codeGsConstant('SHEET_ID'))) throw new Error('No access to that spreadsheet.');
+        return book;
+      },
+      getActiveSpreadsheet: () => book,
       flush: () => undefined,
     },
     LockService: {
