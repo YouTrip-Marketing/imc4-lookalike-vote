@@ -823,7 +823,7 @@ async function partD(
     await shot(voter, 'prod-sheet-390-0-runtime-top20');
   });
 
-  await step('production sheet build, window open: vote, pop-up links to the blog, row written', async () => {
+  await step('production sheet build, window open: vote, pop-up links to the YouTrip OneLink, row written', async () => {
     await see(voter, OPEN_H1);
     assert.equal(await voter.$('.demo-banner'), null);
     await pickCard(voter, 7);
@@ -833,7 +833,7 @@ async function partD(
     await see(voter, 'Done. Your vote is counted.');
     await checkPromo(voter, 'pop-up');
     const href = await voter.$eval('dialog.sheet--promo .promo-banner', (node) => node.getAttribute('href'));
-    assert.equal(href, 'https://www.you.co/sg/blog/100-flights-to-korea/');
+    assert.equal(href, 'https://youtrip.onelink.me/P5AL/voting-site');
     await shot(voter, 'prod-sheet-390-2-popup');
     const rows = openStub.script.votes()?.rows.slice(1) ?? [];
     assert.equal(rows.length, 1);

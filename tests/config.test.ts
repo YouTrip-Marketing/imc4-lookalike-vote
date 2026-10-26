@@ -98,12 +98,12 @@ describe('event.config.ts', () => {
     expect(sharedAddressRule.votes).toBeGreaterThanOrEqual(2);
   });
 
-  it('points the promo banner at the supplied creatives (3:1 and 16:9 phone), with the agreed alt text and the blog link', () => {
+  it('points the promo banner at the supplied creatives (3:1 and 16:9 phone), with the agreed alt text and the YouTrip OneLink', () => {
     expect(promoBanner).toEqual({
       image: 'promo/imc4-100-flights-korea-banner-1920x640.jpg',
       phoneImage: 'promo/imc4-100-flights-korea-banner-1080x608.jpg',
       alt: '100 free flights to Korea. Sign up for YouTrip with FLY100KR, 28 Oct to 31 Dec. T&Cs apply.',
-      href: 'https://www.you.co/sg/blog/100-flights-to-korea/',
+      href: 'https://youtrip.onelink.me/P5AL/voting-site',
     });
     expect(existsSync(resolve(import.meta.dirname, '..', 'public', promoBanner.image ?? ''))).toBe(true);
     expect(existsSync(resolve(import.meta.dirname, '..', 'public', promoBanner.phoneImage ?? ''))).toBe(true);

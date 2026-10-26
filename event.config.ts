@@ -98,8 +98,8 @@ export const keyVisual: KeyVisual = {
  *   phoneImage  16:9 (1080 x 608, under 250 KB), used below 640px wide, where
  *               the 3:1 image would be too small to read. Supplied by Kelicia,
  *               2026-09-30.
- *   href        the campaign landing page, https:// only. Empty = plain image.
- *               UNKNOWN as of 2026-09-30, so left empty. `npm run check:deploy` warns.
+ *   href        where a tap goes, https:// only. Empty = plain image (and
+ *               `npm run check:deploy` warns). Since 2026-10-26: the YouTrip OneLink.
  *
  * Where it shows: at the bottom of the page, after the contestants; once the
  * visitor has voted, directly under the "vote counted" message. Never in the
@@ -109,8 +109,9 @@ export const promoBanner: PromoBanner = {
   image: 'promo/imc4-100-flights-korea-banner-1920x640.jpg',
   phoneImage: 'promo/imc4-100-flights-korea-banner-1080x608.jpg',
   alt: '100 free flights to Korea. Sign up for YouTrip with FLY100KR, 28 Oct to 31 Dec. T&Cs apply.',
-  // The campaign blog post (IMC 4 Overview tab), live from 28 Oct 2026.
-  href: 'https://www.you.co/sg/blog/100-flights-to-korea/',
+  // AppsFlyer OneLink that opens the YouTrip app (Kelicia, 26 Oct 2026). Was the
+  // campaign blog post. Desktop and no-app fallback is set on the AppsFlyer side.
+  href: 'https://youtrip.onelink.me/P5AL/voting-site',
 };
 
 /**
