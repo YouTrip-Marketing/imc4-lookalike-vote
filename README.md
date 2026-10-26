@@ -436,7 +436,7 @@ The public session tells the page nothing about any voter. The page cannot ask
 "has this email voted?" without casting a vote.
 
 ### Top 20 contestants: the Contestants tab (no republish)
-The page reads names, Instagram handles, taglines and photos from the **Contestants** tab of "Voting site", through Code.gs, **from the reveal (2 Nov 12:00 SGT)**. Before that the public answer is empty, so the tab can be filled in early without leaking the Top 20. Nothing needs rebuilding or republishing.
+The page reads names, Instagram handles, taglines and photos from the **Contestants** tab of "Voting site", through Code.gs, **as soon as it is filled in** (the reveal time equals the opening, 26 Oct). Rows left blank keep their placeholders. Nothing needs rebuilding or republishing.
 
 | Column | What to put |
 |---|---|
@@ -766,7 +766,7 @@ either removed paragraph comes back.
 
 **Vote store:** Kelicia's private Google Sheet **"Voting site"** ([`1ir3Umrw3Xq_ImhOA08Qcdj4aXD06LRuJSoDvCFLMqKI`](https://docs.google.com/spreadsheets/d/1ir3Umrw3Xq_ImhOA08Qcdj4aXD06LRuJSoDvCFLMqKI)) through `apps-script/Code.gs`, which refuses to write to any other spreadsheet. (The 13 Oct sheet `1nq_hyB…` is the test target only.)
 
-**Tally tab** (live, formula-only, nothing for Code.gs to maintain): **Total votes** headline (B1), Refused repeats (B2), Last vote at (B3, the latest counted vote's SGT timestamp), a note that it updates live, then Rank / No. / Contestant name / Votes for 1 to 20. Votes per contestant are `COUNTIFS(Votes!E:E, no., Votes!I:I, FALSE)`: they depend on Votes column E (Contestant no.) and I (Duplicate?), so re-check them after any change to Code.gs's column order. Replace the "Contestant N" names when the real Top 20 are known. Code.gs enforces the voting window (2 Nov 12:00 to 5 Nov 23:59 SGT, same as `event.config.ts`, unit-tested), one vote per email, and the admin passcode for the tally. The page shows no banner and follows the same window. Admin Open/Close is disabled: the window opens and closes by itself.
+**Tally tab** (live, formula-only, nothing for Code.gs to maintain): **Total votes** headline (B1), Refused repeats (B2), Last vote at (B3, the latest counted vote's SGT timestamp), a note that it updates live, then Rank / No. / Contestant name / Votes for 1 to 20. Votes per contestant are `COUNTIFS(Votes!E:E, no., Votes!I:I, FALSE)`: they depend on Votes column E (Contestant no.) and I (Duplicate?), so re-check them after any change to Code.gs's column order. Replace the "Contestant N" names when the real Top 20 are known. Code.gs enforces the voting window (open from 26 Oct 2026 00:00 to 5 Nov 23:59 SGT per Kelicia, 26 Oct: "live anytime"; same as `event.config.ts`, unit-tested), one vote per email, and the admin passcode for the tally. The page shows no banner and follows the same window. Admin Open/Close is disabled: the window opens and closes by itself.
 
 **Admin passcode:** only its SHA-256 is in Code.gs (`ADMIN_KEY_SHA256`); the passcode itself is in `developer/outbox/imc4-voting-site-ADMIN-PASSCODE.txt` (gitignored) and never in the page. `#/admin` sends it to Code.gs, which answers the tally only to the right passcode.
 
@@ -792,7 +792,7 @@ cd dist-prod && git add -A && git commit -m "Publish voting site" && git push ht
 
 ### 3. Check, then clean up
 1. Open the URL: no banner, "Voting opens soon", Mon 2 Nov 12:00pm SGT.
-2. **Organiser test vote, any time (no tools needed):** open `#/admin`, unlock with the passcode, tap **Cast a test vote**. In that same tab the voting page shows an amber **ORGANISER TEST** bar, is open, and previews the Contestants tab. Vote with any email. The row lands in **Votes** with **Organiser test? = TRUE** (shaded amber); the Tally leaves it out and counts it under "Organiser test rows". A test vote never blocks that email's real vote, and it leaves no "I voted" note on the phone. Delete test rows whenever convenient. Closing the tab or **Lock** ends organiser mode. (`scripts/organiser-test-vote.ts` does the same from the terminal.)
+2. **Organiser test mode is switched off in the page (26 Oct: voting is open to everyone, so just vote normally).** The notes below describe the dormant mechanism. **Organiser test vote:** open `#/admin`, unlock with the passcode, tap **Cast a test vote**. In that same tab the voting page shows an amber **ORGANISER TEST** bar, is open, and previews the Contestants tab. Vote with any email. The row lands in **Votes** with **Organiser test? = TRUE** (shaded amber); the Tally leaves it out and counts it under "Organiser test rows". A test vote never blocks that email's real vote, and it leaves no "I voted" note on the phone. Delete test rows whenever convenient. Closing the tab or **Lock** ends organiser mode. (`scripts/organiser-test-vote.ts` does the same from the terminal.)
 3. `#/admin` with the passcode: the tally loads.
 
 ### Known limits

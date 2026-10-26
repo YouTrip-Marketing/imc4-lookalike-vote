@@ -9,8 +9,7 @@ import {
   type ReactNode,
 } from 'react';
 import { event } from '../../event.config';
-import { useContestants, useRefreshContestants } from '../contestants';
-import { recallPasscode } from '../organiser';
+import { useContestants } from '../contestants';
 import { DemoVoterPanel } from '../demo/lazy';
 import { checkEmail, type EmailProblem } from '../domain/email';
 import { toVoteError, type VoteError } from '../domain/errors';
@@ -72,16 +71,9 @@ const EMAIL_PROBLEM: Record<EmailProblem, string> = {
  */
 export function VoteView({ store }: { store: VoteStore }): JSX.Element {
   const contestants = useContestants();
-  const refreshContestants = useRefreshContestants();
-  // ORGANISER TEST: #/admin was unlocked in this tab. Set before the first load.
-  const organiser = useMemo(() => {
-    if (store.setOrganiserKey === undefined) return false;
-    store.setOrganiserKey(recallPasscode());
-    return store.organiserMode === true;
-  }, [store]);
-  useEffect(() => {
-    if (organiser) refreshContestants();
-  }, [organiser, refreshContestants]);
+  // Organiser test mode is switched off (26 Oct 2026: voting is open to everyone
+  // from now). The store and Code.gs still support it; nothing turns it on.
+  const organiser = false;
   const storage = useMemo(() => browserStorage(), []);
   const [marker, setMarker] = useState<VoteMarker | null>(() => readVoteMarker(storage, event.id));
   const [cast, setCast] = useState<CastState>({ phase: 'idle' });
@@ -186,7 +178,7 @@ export function VoteView({ store }: { store: VoteStore }): JSX.Element {
         setCast({ phase: 'failed', error, contestant, email: address, requestId });
       }
     },
-    [store, storage, organiser],
+    [store, storage],
   );
 
   const confirm = (formEvent: FormEvent<HTMLFormElement>, contestant: Contestant): void => {

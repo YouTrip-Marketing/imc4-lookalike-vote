@@ -46,11 +46,6 @@ export function AdminView({ store }: { store: VoteStore }): JSX.Element {
         <Brand />
         {passcode !== null && (
           <span className="admin__top-actions">
-            {store.supportsOrganiserTest === true && (
-              <a className="button button--ghost" href="#/">
-                Cast a test vote
-              </a>
-            )}
             <button type="button" className="button button--ghost" onClick={lock}>
               Lock
             </button>

@@ -738,33 +738,28 @@ async function partD(
   openSite: string,
   openStub: SheetStubServer,
 ): Promise<void> {
-  await step('production sheet build: no TEST or DEMO banner, real window, nothing votable before 2 Nov', async () => {
+  await step('production sheet build, real config: open now (26 Oct), no banner, no "Voting opens" text, placeholders while the tab is empty', async () => {
     const page = await open(await browser.createBrowserContext(), `${closedSite}${PAGES_BASE}`);
-    await see(page, 'Voting opens soon');
-    await see(page, `Voting opens ${formatSgtDateTime(votingWindow.opensAt)}.`);
+    await see(page, OPEN_H1);
+    await see(page, `Vote your favourite lookalike now! Voting closes ${formatSgtDateTime(votingWindow.closesAt)}.`);
     const body = await text(page);
-    assert.equal(/TEST SITE|DEMO DATA|Demo controls/.test(body), false, 'a test/demo banner is on the production page');
+    assert.equal(/TEST SITE|DEMO DATA|Demo controls|ORGANISER TEST/.test(body), false, 'a test/demo banner is on the production page');
+    assert.equal(/Voting opens|not open yet/i.test(body), false, 'closed-state text is showing');
     assert.equal(await page.$('.demo-banner'), null);
-    assert.equal(await cardsDisabled(page), true);
-    // The Contestants tab is filled in, but the reveal is not until voting opens.
+    assert.equal(await cardsDisabled(page), false);
     await see(page, 'Contestant 7');
-    assert.equal(body.includes('Dry Run'), false, 'contestant names showed before the reveal');
-    assert.equal(await page.$('.art--photo'), null, 'a contestant photo showed before the reveal');
-    assert.equal(closedStub.photosServed(), 0, 'a contestant photo was fetched before the reveal');
-    // Not open: the promo sits at the bottom (Revision 10), linking to the blog.
-    await checkPromo(page, 'bottom');
-    await shot(page, 'prod-sheet-390-1-before-window');
+    await noPromoYet(page);
+    await shot(page, 'prod-sheet-390-1-open-now');
     await page.close();
   });
 
-  await step('production sheet build: the sheet itself refuses a vote before the window', async () => {
-    const response = await fetch(`${closedStub.url}/exec`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ contestantNumber: 7, contestantName: 'Contestant 7', email: 'early@example.com', voteId: 'early-0001-aaaa', device: 'x', ip: 'unavailable' }),
-    });
-    assert.deepEqual(await response.json(), { ok: false, error: 'voting_not_open' });
-    assert.equal(closedStub.script.votes(), undefined, 'a row was written before the window');
+  await step('production sheet build, real config: a vote today is counted and lands as a real row', async () => {
+    const page = await open(await browser.createBrowserContext(), `${closedSite}${PAGES_BASE}`);
+    await voteFor(page, 7, 'Today.Voter@Example.com');
+    await see(page, 'Done. Your vote is counted.');
+    const rows = closedStub.script.votes()?.rows.slice(1) ?? [];
+    assert.deepEqual([rows.length, rows[0]?.[4], rows[0]?.[8], rows[0]?.[9]], [1, 7, false, false]);
+    await page.close();
   });
 
   await step('production sheet build: no demo passcode, demo panels, demo store or placeholder in the bundle', async () => {
@@ -790,47 +785,8 @@ async function partD(
     await admin.type('#passcode', SHEET_ADMIN);
     await press(admin, 'Unlock');
     await see(admin, 'Tally and ranking');
-    await votesCounted(admin, 0);
+    await votesCounted(admin, 1);
     await admin.close();
-  });
-
-  await step('ORGANISER TEST before 2 Nov: unlock #/admin, "Cast a test vote", vote, row marked as a test', async () => {
-    const tab = await open(await browser.createBrowserContext(), `${closedSite}${PAGES_BASE}#/admin`);
-    await tab.waitForSelector('#passcode');
-    await tab.type('#passcode', SHEET_ADMIN);
-    await press(tab, 'Unlock');
-    await see(tab, 'Tally and ranking');
-    await tab.click('a[href="#/"]');
-    await see(tab, 'ORGANISER TEST');
-    await see(tab, 'Votes are marked as tests and left out of the Tally.');
-    await see(tab, OPEN_H1);
-    // The Top 20 preview: the tab's names before the reveal, for the organiser only.
-    await see(tab, 'Dry Run 07');
-    await shot(tab, 'prod-sheet-390-4-organiser-test');
-    await pickCard(tab, 7);
-    await see(tab, 'Vote for #7 Dry Run 07?');
-    await typeEmail(tab, 'Organiser.Test@Example.com');
-    await press(tab, 'Confirm vote', 'dialog.sheet');
-    await see(tab, 'Done. Your vote is counted.');
-    const rows = closedStub.script.votes()?.rows.slice(1) ?? [];
-    assert.equal(rows.length, 1);
-    assert.deepEqual([rows[0]?.[4], rows[0]?.[5], rows[0]?.[8], rows[0]?.[9]], [7, 'Dry Run 07', false, true]);
-    const marker = await tab.evaluate(() => Object.keys(localStorage).filter((key) => key.startsWith('imc4-voted')));
-    assert.deepEqual(marker, [], 'an organiser test left an "I voted" note in the browser');
-    await press(tab, 'Close', 'dialog.sheet--promo');
-    await shot(tab, 'prod-sheet-390-5-organiser-voted');
-    await tab.close();
-  });
-
-  await step('ORGANISER TEST: the public page stays closed, with placeholders, and the test is not in the tally', async () => {
-    const page = await open(await browser.createBrowserContext(), `${closedSite}${PAGES_BASE}`);
-    await see(page, 'Voting opens soon');
-    assert.equal(await cardsDisabled(page), true);
-    const body = await text(page);
-    assert.equal(/ORGANISER TEST|Dry Run/.test(body), false);
-    await page.close();
-    const tally = closedStub.script.doGet(SHEET_ADMIN).json as { data: { votes: unknown[] } };
-    assert.deepEqual(tally.data.votes, []);
   });
 
   const context = await browser.createBrowserContext();
@@ -1218,7 +1174,7 @@ async function partA(browser: Browser, site: string): Promise<void> {
     await lastHit.hover();
     await admin.waitForSelector('.chart__tooltip');
     const hovered = await admin.$eval('.chart__tooltip', (node) => (node as HTMLElement).innerText);
-    assert.match(hovered, /\d+ votes?\s+from \d+ Nov, \d+:\d{2}(am|pm)/);
+    assert.match(hovered, /\d+ votes?\s+from \d+ (Oct|Nov), \d+:\d{2}(am|pm)/);
     await admin.mouse.move(0, 0);
     await admin.$eval('.chart svg', (svg) => (svg as SVGSVGElement).focus());
     await admin.waitForSelector('.chart__tooltip');
@@ -1265,7 +1221,7 @@ async function partA(browser: Browser, site: string): Promise<void> {
     const everything = `${tally.join('\n')}\n${log.join('\n')}`;
     assert.equal(everything.includes('@'), false, 'an email address is in the CSV');
     assert.equal(/alice|visitor|example/i.test(everything), false, 'part of an email is in the CSV');
-    assert.match(log[1] ?? '', /^\d+,2026-11-0\d \d\d:\d\d:\d\d,2026-11-0\dT[\d:.]+Z,\d+,c\d\d,Contestant \d+,counted,,/);
+    assert.match(log[1] ?? '', /^\d+,2026-1[01]-\d\d \d\d:\d\d:\d\d,2026-1[01]-\d\dT[\d:.]+Z,\d+,c\d\d,Contestant \d+,counted,,/);
   });
 
   await step('admin: many votes from one network are flagged with a count, never the address', async () => {
@@ -2290,13 +2246,10 @@ async function main(): Promise<void> {
     const sheetSite = `http://127.0.0.1:${SITE_PORT_SHEET}`;
     await partC(browser, sheetSite, sheetStub, sheetDir, prodDir);
 
-    console.log('\nPart D: PRODUCTION Google Sheet build under /imc4-lookalike-vote/ (real window, then an open stand-in window)');
+    console.log('\nPart D: PRODUCTION Google Sheet build under /imc4-lookalike-vote/ (real config, open from 26 Oct; then a filled Contestants tab)');
     sheetProdStub = await startSheetStubServer(SHEET_STUB_PROD_PORT, {
       adminKey: SHEET_ADMIN,
       window: { opensAt: votingWindow.opensAt ?? '', closesAt: votingWindow.closesAt ?? '' },
-      // Filled in early, as Kelicia will on 1 Nov: must stay hidden until the reveal.
-      contestants: dryRunContestants(SHEET_STUB_PROD_PORT),
-      localPhotos: true,
     });
     const sheetProdDir = join(BUILDS, 'sheet-prod');
     await buildSite(sheetProdDir, {
