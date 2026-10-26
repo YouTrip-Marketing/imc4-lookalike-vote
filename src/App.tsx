@@ -4,6 +4,7 @@ import { toVoteError, type VoteError } from './domain/errors';
 import { useRoute } from './router';
 import { createVoteStore, type VoteStore } from './storage';
 import { ContestantsProvider } from './contestants';
+import { INTERIM_LOCAL } from './interim';
 import { DemoBanner, Message, Spinner } from './ui/common';
 import { AdminView } from './views/AdminView';
 import { VoteView } from './views/VoteView';
@@ -51,7 +52,7 @@ export function App(): JSX.Element {
 
   return (
     <div className={`app app--${route.view}`}>
-      {store.isDemo && <DemoBanner />}
+      {store.isDemo && !INTERIM_LOCAL && <DemoBanner />}
       <ContestantsProvider store={store}>
         {route.view === 'admin' ? <AdminView store={store} /> : <VoteView store={store} />}
       </ContestantsProvider>

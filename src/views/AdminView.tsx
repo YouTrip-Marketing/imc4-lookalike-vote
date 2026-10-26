@@ -1,6 +1,7 @@
 import { Suspense, useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
 import { burstRule, event, sharedAddressRule } from '../../event.config';
 import { useContestants } from '../contestants';
+import { INTERIM_LOCAL } from '../interim';
 import { recallPasscode, rememberPasscode } from '../organiser';
 import { DemoAdminPanel } from '../demo/lazy';
 import { detectBursts, tallyVotes, volumeTimeline } from '../domain/analytics';
@@ -53,6 +54,11 @@ export function AdminView({ store }: { store: VoteStore }): JSX.Element {
         )}
       </div>
       <h1>Voting admin</h1>
+      {INTERIM_LOCAL && (
+        <p className="hint hint--warn" role="note">
+          Votes are stored locally in each browser until the Google Sheet is linked.
+        </p>
+      )}
       {passcode === null ? (
         <PasscodeGate
           store={store}
@@ -106,7 +112,7 @@ function PasscodeGate({
         aria-invalid={error !== null}
         autoFocus
       />
-      {hasDemoControls(store) && (
+      {hasDemoControls(store) && !INTERIM_LOCAL && (
         <p className="hint">
           Demo passcode: <code>{store.demoPasscode}</code>
         </p>

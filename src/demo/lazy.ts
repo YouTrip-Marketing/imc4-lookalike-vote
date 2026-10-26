@@ -8,11 +8,15 @@ import { lazy } from 'react';
  * removed, and the demo panels are not in the bundle at all.
  */
 export const DemoVoterPanel =
-  import.meta.env.VITE_STORAGE_ADAPTER === 'api' || import.meta.env.VITE_STORAGE_ADAPTER === 'sheet'
+  import.meta.env.VITE_STORAGE_ADAPTER === 'api' ||
+  import.meta.env.VITE_STORAGE_ADAPTER === 'sheet' ||
+  import.meta.env.VITE_INTERIM_LOCAL === '1'
     ? null
     : lazy(() => import('./DemoVoterPanel'));
 
 export const DemoAdminPanel =
-  import.meta.env.VITE_STORAGE_ADAPTER === 'api' || import.meta.env.VITE_STORAGE_ADAPTER === 'sheet'
+  import.meta.env.VITE_STORAGE_ADAPTER === 'api' ||
+  import.meta.env.VITE_STORAGE_ADAPTER === 'sheet' ||
+  import.meta.env.VITE_INTERIM_LOCAL === '1'
     ? null
     : lazy(() => import('./DemoAdminPanel'));

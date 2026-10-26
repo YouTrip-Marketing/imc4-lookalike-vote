@@ -1,4 +1,5 @@
 import { contestants, demo, votingRules, votingWindow } from '../../event.config';
+import { INTERIM_LOCAL } from '../interim';
 import { browserStorage } from './keyValue';
 import { LocalVoteStore, type LocalStoreOptions } from './localStore';
 
@@ -41,9 +42,10 @@ export function createDemoStore(): LocalVoteStore {
       passcode: demo.passcode,
     },
     storage: browserStorage(),
-    latencyMs: 250,
+    latencyMs: INTERIM_LOCAL ? 0 : 250,
     // Start inside the voting window, so the page can be voted on whatever today's date is.
-    initialClock: 'during',
+    // The interim public build uses the real clock (voting is open from 26 Oct).
+    initialClock: INTERIM_LOCAL ? 'real' : 'during',
     channel: otherTabs(),
   });
 }
