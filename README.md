@@ -435,6 +435,13 @@ the marker and reopens the ballot. It gains nobody a second vote.
 The public session tells the page nothing about any voter. The page cannot ask
 "has this email voted?" without casting a vote.
 
+### Custom domain later (CNAME)
+To serve the site from a you.co subdomain (e.g. `vote.you.co`) instead of youtrip-marketing.github.io:
+1. YouTrip's DNS admin adds a **CNAME** record: `vote` → `youtrip-marketing.github.io`.
+2. Put the domain in a file named `CNAME` in `public/` (one line, e.g. `vote.you.co`), so every build carries it into `dist-prod/`. Rebuild and publish.
+3. GitHub: repo **Settings > Pages > Custom domain** shows the domain; once the DNS check passes, tick **Enforce HTTPS**.
+4. The page works under any path (relative asset paths, hash routing), so nothing else changes. Re-check `#/admin` and one vote after the switch.
+
 ### Known limits of email uniqueness without verification
 
 Stated plainly. These are properties of the method, not defects in the build.
@@ -737,13 +744,15 @@ either removed paragraph comes back.
 
 **URL:** https://youtrip-marketing.github.io/imc4-lookalike-vote/ (repo `YouTrip-Marketing/imc4-lookalike-vote`, public, `gh-pages` branch only; never push `main`). Until the real build is published it shows a one-line holding page.
 
-**Vote store:** Kelicia's private Google Sheet (`1nq_hyBZWk5zbTLuigdTyThQLf94mxaSr_Z3IklOcGEE`) through `apps-script/Code.gs`. Code.gs enforces the voting window (2 Nov 12:00 to 5 Nov 23:59 SGT, same as `event.config.ts`, unit-tested), one vote per email, and the admin passcode for the tally. The page shows no banner and follows the same window. Admin Open/Close is disabled: the window opens and closes by itself.
+**Vote store:** Kelicia's private Google Sheet **"Voting site"** ([`1ir3Umrw3Xq_ImhOA08Qcdj4aXD06LRuJSoDvCFLMqKI`](https://docs.google.com/spreadsheets/d/1ir3Umrw3Xq_ImhOA08Qcdj4aXD06LRuJSoDvCFLMqKI)) through `apps-script/Code.gs`, which refuses to write to any other spreadsheet. (The 13 Oct sheet `1nq_hyB…` is the test target only.)
+
+**Tally tab** (live, formula-only, nothing for Code.gs to maintain): **Total votes** headline (B1), Refused repeats (B2), Last vote at (B3, the latest counted vote's SGT timestamp), a note that it updates live, then Rank / No. / Contestant name / Votes for 1 to 20. Votes per contestant are `COUNTIFS(Votes!E:E, no., Votes!I:I, FALSE)`: they depend on Votes column E (Contestant no.) and I (Duplicate?), so re-check them after any change to Code.gs's column order. Replace the "Contestant N" names when the real Top 20 are known. Code.gs enforces the voting window (2 Nov 12:00 to 5 Nov 23:59 SGT, same as `event.config.ts`, unit-tested), one vote per email, and the admin passcode for the tally. The page shows no banner and follows the same window. Admin Open/Close is disabled: the window opens and closes by itself.
 
 **Admin passcode:** only its SHA-256 is in Code.gs (`ADMIN_KEY_SHA256`); the passcode itself is in `developer/outbox/imc4-voting-site-ADMIN-PASSCODE.txt` (gitignored) and never in the page. `#/admin` sends it to Code.gs, which answers the tally only to the right passcode.
 
 ### 1. Kelicia: deploy Code.gs (once, in the browser)
 Paste the CURRENT `apps-script/Code.gs`: it changed on 26 Oct (window, admin passcode).
-1. Open the sheet. **Extensions > Apps Script**.
+1. Open the **"Voting site"** spreadsheet (https://docs.google.com/spreadsheets/d/1ir3Umrw3Xq_ImhOA08Qcdj4aXD06LRuJSoDvCFLMqKI), NOT the 13 Oct test sheet. **Extensions > Apps Script** from inside it.
 2. Select everything in `Code.gs`, delete, paste the whole file (`pbcopy < apps-script/Code.gs`). **Save**.
 3. **Deploy > New deployment**. Gear next to "Select type" > **Web app**.
 4. **Execute as: Me**. **Who has access: Anyone**.
@@ -767,7 +776,7 @@ cd dist-prod && git add -A && git commit -m "Publish voting site" && git push ht
 3. `#/admin` with the passcode: the tally loads.
 
 ### Known limits
-- Emails are not verified: anyone can vote once per made-up address. One-time-code verification was recommended and never decided; it cannot be built by 2 Nov.
+- Emails are not verified: anyone can vote once per made-up address. One-time-code verification was recommended and never built. **Risk accepted by Kelicia, 26 Oct 2026.**
 - IP is self-reported by the page (api.ipify.org), indicative only and forgeable. Never used to refuse a vote.
 - Apps Script quotas: about 30 simultaneous executions; a burst of votes may see "busy" and retry automatically (4 tries with backoff).
 - The tally is read by `#/admin` with the passcode; there are no public counts.

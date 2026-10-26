@@ -40,8 +40,12 @@
  * Replies are JSON: { ok: true, data: {...} } or { ok: false, error: '<code>' }.
  */
 
-/** The one spreadsheet this script may write to: "Jkook lookalike contest voting site". */
-var SHEET_ID = '1nq_hyBZWk5zbTLuigdTyThQLf94mxaSr_Z3IklOcGEE';
+/**
+ * The one spreadsheet this script may write to: Kelicia's "Voting site"
+ * (production, 26 Oct 2026). The 13 Oct test sheet, 1nq_hyBZWk5zbTLuigdTyThQLf94mxaSr_Z3IklOcGEE,
+ * is the test target only: a copy deployed there needs this ID changed.
+ */
+var SHEET_ID = '1ir3Umrw3Xq_ImhOA08Qcdj4aXD06LRuJSoDvCFLMqKI';
 var VOTES_TAB = 'Votes';
 /** Same instants as votingWindow in event.config.ts. */
 var OPENS_AT = '2026-11-02T12:00:00+08:00';

@@ -184,6 +184,10 @@ describe('Code.gs doGet', () => {
 });
 
 describe('Code.gs production rules (26 Oct 2026)', () => {
+  it('writes only to the production "Voting site" spreadsheet', () => {
+    expect(codeGsConstant('SHEET_ID')).toBe('1ir3Umrw3Xq_ImhOA08Qcdj4aXD06LRuJSoDvCFLMqKI');
+  });
+
   it('has the same voting window as event.config.ts', () => {
     expect(Date.parse(codeGsConstant('OPENS_AT'))).toBe(Date.parse(votingWindow.opensAt ?? ''));
     expect(Date.parse(codeGsConstant('CLOSES_AT'))).toBe(Date.parse(votingWindow.closesAt ?? ''));

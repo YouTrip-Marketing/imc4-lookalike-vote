@@ -74,8 +74,6 @@ export interface AppsScriptRun {
   call(name: string, ...args: unknown[]): unknown;
 }
 
-/** The real sheet's ID, as set in Code.gs. */
-export const TEST_SHEET_ID = '1nq_hyBZWk5zbTLuigdTyThQLf94mxaSr_Z3IklOcGEE';
 
 export interface AppsScriptOptions {
   now?: () => Date;
@@ -109,7 +107,7 @@ export function loadAppsScript(options: AppsScriptOptions = {}): AppsScriptRun {
   const services = {
     SpreadsheetApp: {
       getActiveSpreadsheet: () => ({
-        getId: () => options.sheetId ?? TEST_SHEET_ID,
+        getId: () => options.sheetId ?? codeGsConstant('SHEET_ID'),
         getSheetByName: (name: string) => tabs.get(name) ?? null,
         insertSheet: (name: string) => {
           const sheet = new FakeSheet();
