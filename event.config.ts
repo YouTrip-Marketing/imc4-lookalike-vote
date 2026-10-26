@@ -143,7 +143,7 @@ export const contestants: readonly Contestant[] = Array.from({ length: 20 }, (_,
  * the window but cannot move its edges.
  */
 export const votingWindow: VotingWindow = {
-  opensAt: '2026-11-02T12:00:00+08:00',
+  opensAt: '2026-10-26T00:00:00+08:00',
   closesAt: '2026-11-05T23:59:00+08:00',
   autoOpen: true,
 };

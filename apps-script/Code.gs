@@ -60,7 +60,7 @@
 var SHEET_ID = '1ir3Umrw3Xq_ImhOA08Qcdj4aXD06LRuJSoDvCFLMqKI';
 var VOTES_TAB = 'Votes';
 /** Same instants as votingWindow in event.config.ts. */
-var OPENS_AT = '2026-11-02T12:00:00+08:00';
+var OPENS_AT = '2026-10-26T00:00:00+08:00';
 var CLOSES_AT = '2026-11-05T23:59:00+08:00';
 /** Contestant names and photos are public from this instant: the Top 20 reveal, when voting opens. */
 var REVEAL_AT = OPENS_AT;
