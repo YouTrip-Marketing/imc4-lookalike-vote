@@ -3,6 +3,7 @@ import type {
   AdminStatus,
   AuditRow,
   ContestantId,
+  ContestantList,
   EventState,
   PublicSession,
   VoteReceipt,
@@ -53,6 +54,12 @@ export interface VoteStore {
    */
   adminGetAudit(passcode: string): Promise<AuditRow[]>;
   adminSetStatus(passcode: string, status: AdminStatus): Promise<EventState>;
+
+  /**
+   * Optional: the Top 20 as entered after the call closes (names, handles,
+   * photos), for stores that hold them. Stores without it use event.config.ts.
+   */
+  getContestants?(): Promise<ContestantList>;
 
   /**
    * Push-style change notification, where the backend has one. Views also poll,

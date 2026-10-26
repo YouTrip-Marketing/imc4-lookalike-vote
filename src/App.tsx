@@ -3,6 +3,7 @@ import { event } from '../event.config';
 import { toVoteError, type VoteError } from './domain/errors';
 import { useRoute } from './router';
 import { createVoteStore, type VoteStore } from './storage';
+import { ContestantsProvider } from './contestants';
 import { DemoBanner, Message, Spinner } from './ui/common';
 import { AdminView } from './views/AdminView';
 import { VoteView } from './views/VoteView';
@@ -51,7 +52,9 @@ export function App(): JSX.Element {
   return (
     <div className={`app app--${route.view}`}>
       {store.isDemo && <DemoBanner />}
-      {route.view === 'admin' ? <AdminView store={store} /> : <VoteView store={store} />}
+      <ContestantsProvider store={store}>
+        {route.view === 'admin' ? <AdminView store={store} /> : <VoteView store={store} />}
+      </ContestantsProvider>
     </div>
   );
 }

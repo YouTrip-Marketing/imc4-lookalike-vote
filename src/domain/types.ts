@@ -215,3 +215,22 @@ export interface BurstFlag {
   lastVoteAt: string;
   votes: number;
 }
+
+/**
+ * Contestant details loaded at runtime (the sheet's "Contestants" tab, from the
+ * Top 20 reveal). Each field, when non-empty, replaces the one in event.config.ts.
+ */
+export interface ContestantDetails {
+  number: number;
+  stageName: string;
+  handle: string;
+  tagline: string;
+  /** https image address, or '' for the abstract placeholder. */
+  photo: string;
+}
+
+export interface ContestantList {
+  /** false before the reveal: the list is empty and the page keeps its placeholders. */
+  revealed: boolean;
+  contestants: readonly ContestantDetails[];
+}

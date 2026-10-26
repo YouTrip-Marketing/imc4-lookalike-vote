@@ -27,7 +27,7 @@ import { build, preview, type Plugin, type PreviewServer } from 'vite';
 import { burstRule, contestants, demo, event, keyVisual, promoBanner, votingWindow } from '../event.config';
 import { formatLongCalendarDate, formatSgtDateTime } from '../src/domain/time';
 import { startLocalApiServer, type LocalApiServer } from './local-api-server';
-import { STUB_IP, startSheetStubServer, type SheetStubServer } from './sheet-stub-server';
+import { STUB_IP, dryRunContestants, startSheetStubServer, type SheetStubServer } from './sheet-stub-server';
 
 const ROOT = resolve(import.meta.dirname, '..');
 const OUT = resolve(ROOT, 'e2e-artifacts');
@@ -746,6 +746,11 @@ async function partD(
     assert.equal(/TEST SITE|DEMO DATA|Demo controls/.test(body), false, 'a test/demo banner is on the production page');
     assert.equal(await page.$('.demo-banner'), null);
     assert.equal(await cardsDisabled(page), true);
+    // The Contestants tab is filled in, but the reveal is not until voting opens.
+    await see(page, 'Contestant 7');
+    assert.equal(body.includes('Dry Run'), false, 'contestant names showed before the reveal');
+    assert.equal(await page.$('.art--photo'), null, 'a contestant photo showed before the reveal');
+    assert.equal(closedStub.photosServed(), 0, 'a contestant photo was fetched before the reveal');
     // Not open: the promo sits at the bottom (Revision 10), linking to the blog.
     await checkPromo(page, 'bottom');
     await shot(page, 'prod-sheet-390-1-before-window');
@@ -792,10 +797,44 @@ async function partD(
   const context = await browser.createBrowserContext();
   const voter = await open(context, `${openSite}${PAGES_BASE}`);
 
+  await step('runtime Top 20 dry run: names, handles and 20 photos from the Contestants tab, with the photo treatment', async () => {
+    await see(voter, 'Dry Run 07');
+    const cards = await voter.$$eval('.grid > li', (items) =>
+      items.map((item) => ({
+        name: item.querySelector('.card__stage')?.textContent ?? '',
+        label: item.querySelector('.card__label')?.textContent ?? '',
+      })),
+    );
+    assert.equal(cards.length, 20);
+    assert.deepEqual(cards[6], { name: 'Dry Run 07', label: 'No. 07 · Town · @dryrun_07' });
+    await voter.evaluate(async () => {
+      for (const img of document.querySelectorAll<HTMLImageElement>('.grid .art--photo')) {
+        img.loading = 'eager';
+      }
+      window.scrollTo(0, document.body.scrollHeight);
+    });
+    await voter.waitForFunction(
+      () => {
+        const photos = [...document.querySelectorAll<HTMLImageElement>('.grid .art--photo')];
+        return photos.length === 20 && photos.every((img) => img.complete && img.naturalWidth > 0);
+      },
+      { timeout: 20_000 },
+    );
+    const treatment = await voter.$eval('.grid .art--photo', (img) => getComputedStyle(img).filter);
+    assert.notEqual(treatment, 'none', 'the photo treatment is missing on a runtime photo');
+    const alt = await voter.$eval('.grid > li:nth-child(7) .art--photo', (img) => (img as HTMLImageElement).alt);
+    assert.equal(alt, 'Dry Run 07, contestant 7');
+    await voter.evaluate(() => window.scrollTo(0, 0));
+    await shot(voter, 'prod-sheet-390-0-runtime-top20');
+  });
+
   await step('production sheet build, window open: vote, pop-up links to the blog, row written', async () => {
     await see(voter, OPEN_H1);
     assert.equal(await voter.$('.demo-banner'), null);
-    await voteFor(voter, 7, 'Prod.Voter@Example.com');
+    await pickCard(voter, 7);
+    await see(voter, 'Vote for #7 Dry Run 07?');
+    await typeEmail(voter, 'Prod.Voter@Example.com');
+    await press(voter, 'Confirm vote', 'dialog.sheet');
     await see(voter, 'Done. Your vote is counted.');
     await checkPromo(voter, 'pop-up');
     const href = await voter.$eval('dialog.sheet--promo .promo-banner', (node) => node.getAttribute('href'));
@@ -803,14 +842,17 @@ async function partD(
     await shot(voter, 'prod-sheet-390-2-popup');
     const rows = openStub.script.votes()?.rows.slice(1) ?? [];
     assert.equal(rows.length, 1);
-    assert.deepEqual([rows[0]?.[2], rows[0]?.[4], rows[0]?.[8]], ['prod.voter@example.com', 7, false]);
+    assert.deepEqual([rows[0]?.[2], rows[0]?.[4], rows[0]?.[5], rows[0]?.[8]], ['prod.voter@example.com', 7, 'Dry Run 07', false]);
     await press(voter, 'Close', 'dialog.sheet--promo');
     await shot(voter, 'prod-sheet-390-3-voted');
   });
 
   await step('production sheet build, window open: the same email again is refused and logged as a repeat', async () => {
     const other = await open(await browser.createBrowserContext(), `${openSite}${PAGES_BASE}`);
-    await voteFor(other, 3, 'prod.voter@example.com');
+    await pickCard(other, 3);
+    await see(other, 'Vote for #3 Dry Run 03?');
+    await typeEmail(other, 'prod.voter@example.com');
+    await press(other, 'Confirm vote', 'dialog.sheet');
     await see(other, DUPLICATE);
     const rows = openStub.script.votes()?.rows.slice(1) ?? [];
     assert.deepEqual(rows.map((row) => row[8]), [false, true]);
@@ -2213,6 +2255,9 @@ async function main(): Promise<void> {
     sheetProdStub = await startSheetStubServer(SHEET_STUB_PROD_PORT, {
       adminKey: SHEET_ADMIN,
       window: { opensAt: votingWindow.opensAt ?? '', closesAt: votingWindow.closesAt ?? '' },
+      // Filled in early, as Kelicia will on 1 Nov: must stay hidden until the reveal.
+      contestants: dryRunContestants(SHEET_STUB_PROD_PORT),
+      localPhotos: true,
     });
     const sheetProdDir = join(BUILDS, 'sheet-prod');
     await buildSite(sheetProdDir, {
@@ -2223,7 +2268,11 @@ async function main(): Promise<void> {
     servers.push(await serve(sheetProdDir, SITE_PORT_SHEET_PROD, PAGES_BASE));
     const sheetProdSite = `http://127.0.0.1:${SITE_PORT_SHEET_PROD}`;
 
-    sheetProdOpenStub = await startSheetStubServer(SHEET_STUB_PROD_OPEN_PORT, { adminKey: SHEET_ADMIN });
+    sheetProdOpenStub = await startSheetStubServer(SHEET_STUB_PROD_OPEN_PORT, {
+      adminKey: SHEET_ADMIN,
+      contestants: dryRunContestants(SHEET_STUB_PROD_OPEN_PORT),
+      localPhotos: true,
+    });
     const openWindowConfig = join(BUILDS, 'open-window-config.ts');
     writeFileSync(
       openWindowConfig,

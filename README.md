@@ -435,6 +435,26 @@ the marker and reopens the ballot. It gains nobody a second vote.
 The public session tells the page nothing about any voter. The page cannot ask
 "has this email voted?" without casting a vote.
 
+### Top 20 contestants: the Contestants tab (no republish)
+The page reads names, Instagram handles, taglines and photos from the **Contestants** tab of "Voting site", through Code.gs, **from the reveal (2 Nov 12:00 SGT)**. Before that the public answer is empty, so the tab can be filled in early without leaking the Top 20. Nothing needs rebuilding or republishing.
+
+| Column | What to put |
+|---|---|
+| No. | 1 to 20, already filled. The order of the Instagram posts. Do not change. |
+| Name | The contestant's stage name (up to 40 characters). Blank = "Contestant N" stays. |
+| Instagram handle | Optional. `@name` or `name`. Anything that is not a handle is dropped. |
+| Tagline | Optional, up to 40 characters (e.g. a town). |
+| Photo | A Google Drive share link to the photo. The file must be shared **"Anyone with the link"**. A plain https image address also works. |
+
+How photos are served: a Drive link becomes `https://lh3.googleusercontent.com/d/<file id>=w960`, Google's image server, resized to 960px wide, so phone-size originals do not slow the page. The page applies the usual purple treatment. A photo that fails to load leaves the abstract tile; the name still shows.
+
+Timings: the sheet caches the list for 60 seconds, the page asks once a minute until the reveal, then every 5 minutes, and keeps the last good list in the visitor's browser. Edits show within about 6 minutes. The Tally tab's names follow the Contestants tab.
+
+**1 Nov procedure (about 20 minutes):**
+1. Kelicia fills Name (and the optional columns) for 1 to 20 and pastes each photo's Drive link. Blank names are shaded yellow.
+2. Check before the reveal: `npx tsx scripts/contestants-check.ts <passcode file>`. It prints, for each number, whether the name and photo are OK (it uses the admin passcode to see the list early). Fix anything MISSING and run it again until it says 20/20.
+3. At 2 Nov 12:00 the page shows them by itself. No publish step.
+
 ### Custom domain later (CNAME)
 To serve the site from a you.co subdomain (e.g. `vote.you.co`) instead of youtrip-marketing.github.io:
 1. YouTrip's DNS admin adds a **CNAME** record: `vote` → `youtrip-marketing.github.io`.

@@ -231,3 +231,63 @@ describe('Code.gs production rules (26 Oct 2026)', () => {
     expect((script.doGet(ADMIN).json as { ok: boolean }).ok).toBe(true);
   });
 });
+
+describe('Code.gs Contestants tab (runtime Top 20, 26 Oct 2026)', () => {
+  const window = { opensAt: '2026-11-02T12:00:00+08:00', closesAt: '2026-11-05T23:59:00+08:00' };
+  const DRIVE_ID = '1AbCdEfGhIjKlMnOpQrStUvWxYz012345';
+  const rows: (string | number)[][] = [
+    [1, '  Kim  Lookalike ', 'kim.lookalike', 'Jurong West', `https://drive.google.com/file/d/${DRIVE_ID}/view?usp=sharing`],
+    [2, 'Ahmad', '@ahmad_sg', '', `https://drive.google.com/open?id=${DRIVE_ID}`],
+    [3, 'Bad bits', 'not a handle!', 'x'.repeat(80), 'javascript:alert(1)'],
+    [3, 'Second row for 3 is ignored', '', '', ''],
+    [21, 'Out of range', '', '', ''],
+    ['', '', '', '', ''],
+    [4, 'Direct', '', '', 'https://example.com/photos/04.jpg'],
+  ];
+  const at = (iso: string) => loadAppsScript({ now: () => new Date(iso), window, adminKey: ADMIN, contestants: rows });
+  const list = (json: unknown) => (json as { data: { revealed: boolean; contestants: Record<string, unknown>[] } }).data;
+
+  it('answers an empty list before the reveal, even with the tab filled in', () => {
+    expect(list(at('2026-11-02T11:59:59+08:00').doGet(undefined, 'contestants').json)).toEqual({ revealed: false, contestants: [] });
+    expect(list(at('2026-11-02T11:59:59+08:00').doGet('wrong', 'contestants').json).contestants).toEqual([]);
+  });
+
+  it('lets the organisers preview it early with the passcode', () => {
+    const early = list(at('2026-11-01T20:00:00+08:00').doGet(ADMIN, 'contestants').json);
+    expect(early.revealed).toBe(false);
+    expect(early.contestants).toHaveLength(4);
+  });
+
+  it('from the reveal: cleaned rows, Drive links turned into resized image addresses, bad values dropped', () => {
+    const after = list(at('2026-11-02T12:00:00+08:00').doGet(undefined, 'contestants').json);
+    expect(after.revealed).toBe(true);
+    expect(after.contestants).toEqual([
+      { no: 1, name: 'Kim Lookalike', handle: '@kim.lookalike', tagline: 'Jurong West', photo: `https://lh3.googleusercontent.com/d/${DRIVE_ID}=w960` },
+      { no: 2, name: 'Ahmad', handle: '@ahmad_sg', tagline: '', photo: `https://lh3.googleusercontent.com/d/${DRIVE_ID}=w960` },
+      { no: 3, name: 'Bad bits', handle: '', tagline: 'x'.repeat(40), photo: '' },
+      { no: 4, name: 'Direct', handle: '', tagline: '', photo: 'https://example.com/photos/04.jpg' },
+    ]);
+  });
+
+  it('holds no voter data and needs no passcode after the reveal', () => {
+    const script = at('2026-11-03T09:00:00+08:00');
+    script.doPost(vote({ email: 'someone@example.com' }));
+    expect(JSON.stringify(script.doGet(undefined, 'contestants').json)).not.toMatch(/@example\.com|203\.0\.113/);
+  });
+
+  it('caches the list for a minute; the passcode preview always reads the tab fresh', () => {
+    const script = at('2026-11-02T12:30:00+08:00');
+    expect(list(script.doGet(undefined, 'contestants').json).contestants[0]?.name).toBe('Kim Lookalike');
+    const tab = script.tab('Contestants');
+    if (tab?.rows[1] !== undefined) tab.rows[1][1] = 'Renamed';
+    expect(list(script.doGet(undefined, 'contestants').json).contestants[0]?.name).toBe('Kim Lookalike');
+    expect(list(script.doGet(ADMIN, 'contestants').json).contestants[0]?.name).toBe('Renamed');
+    script.clearCache();
+    expect(list(script.doGet(undefined, 'contestants').json).contestants[0]?.name).toBe('Renamed');
+  });
+
+  it('answers an empty list when there is no Contestants tab', () => {
+    const script = loadAppsScript({ now: () => new Date('2026-11-03T09:00:00+08:00'), window });
+    expect(list(script.doGet(undefined, 'contestants').json)).toEqual({ revealed: true, contestants: [] });
+  });
+});

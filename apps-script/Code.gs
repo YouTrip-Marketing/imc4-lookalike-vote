@@ -25,6 +25,15 @@
  *           admin passcode (?key=...), checked against ADMIN_KEY_SHA256 below,
  *           so running totals are not public.
  *
+ *   doGet?view=contestants  the Top 20 from the "Contestants" tab (No., Name,
+ *           Instagram handle, Tagline, Photo = a Google Drive share link or an
+ *           https image address), for the page to show. Public, but EMPTY until
+ *           REVEAL_AT (the reveal is 2 Nov 12:00 SGT), so filling the tab early
+ *           leaks nothing; with the admin passcode (?key=) it answers early, for
+ *           checking. Cached for 60 seconds. Drive links become
+ *           lh3.googleusercontent.com/d/<id>=w960 (Google's image server,
+ *           resized); each file must be shared "Anyone with the link".
+ *
  * Voting window, enforced here whatever the page says: a vote before OPENS_AT
  * is refused with voting_not_open, from CLOSES_AT on with voting_closed. Both
  * must match votingWindow in event.config.ts (a unit test checks). One
@@ -50,6 +59,12 @@ var VOTES_TAB = 'Votes';
 /** Same instants as votingWindow in event.config.ts. */
 var OPENS_AT = '2026-11-02T12:00:00+08:00';
 var CLOSES_AT = '2026-11-05T23:59:00+08:00';
+/** Contestant names and photos are public from this instant: the Top 20 reveal, when voting opens. */
+var REVEAL_AT = OPENS_AT;
+var CONTESTANTS_TAB = 'Contestants';
+var CONTESTANTS_CACHE_SECONDS = 60;
+/** Tests only (scripts/apps-script-harness.ts): lets http://127.0.0.1 photo addresses through. */
+var LOCAL_PHOTOS_FOR_TESTS = false;
 /** SHA-256 (hex) of the admin passcode. The passcode itself is never in this file. */
 var ADMIN_KEY_SHA256 = '0025f030d4ebb2462d18c614e97cd3ff9a4b2cf61b54f61968bf33385d0e1661';
 var CONTESTANT_COUNT = 20;
@@ -188,6 +203,9 @@ function doPost(e) {
 }
 
 function doGet(e) {
+  if (e && e.parameter && e.parameter.view === 'contestants') {
+    return reply_({ ok: true, data: contestantsAnswer_(isAdmin_(e.parameter.key)) });
+  }
   if (!isAdmin_(e && e.parameter ? e.parameter.key : undefined)) return reply_({ ok: false, error: 'bad_passcode' });
   var sheet = votesSheet_();
   if (sheet === null) return reply_({ ok: false, error: 'misconfigured' });
@@ -205,6 +223,70 @@ function doGet(e) {
     });
   }
   return reply_({ ok: true, data: { takenAt: new Date().toISOString(), votes: votes } });
+}
+
+// ---------------------------------------------------------------- contestants
+
+/** { revealed, contestants: [{ no, name, handle, tagline, photo }] }. Nothing about voters. */
+function contestantsAnswer_(admin) {
+  var revealed = new Date().getTime() >= new Date(REVEAL_AT).getTime();
+  if (!revealed && !admin) return { revealed: false, contestants: [] };
+  var cache = admin ? null : CacheService.getScriptCache();
+  var cached = cache === null ? null : cache.get('contestants');
+  if (cached !== null) return { revealed: revealed, contestants: JSON.parse(cached) };
+  var list = readContestants_();
+  if (cache !== null) cache.put('contestants', JSON.stringify(list), CONTESTANTS_CACHE_SECONDS);
+  return { revealed: revealed, contestants: list };
+}
+
+function readContestants_() {
+  var book = SpreadsheetApp.getActiveSpreadsheet();
+  if (book === null || book.getId() !== SHEET_ID) return [];
+  var sheet = book.getSheetByName(CONTESTANTS_TAB);
+  if (sheet === null || sheet.getLastRow() < 2) return [];
+  var rows = sheet.getRange(2, 1, Math.min(sheet.getLastRow() - 1, 60), 5).getValues();
+  var seen = {};
+  var list = [];
+  for (var i = 0; i < rows.length; i += 1) {
+    var no = Number(rows[i][0]);
+    if (!(no >= 1 && no <= CONTESTANT_COUNT) || Math.floor(no) !== no || seen[no]) continue;
+    seen[no] = true;
+    list.push({
+      no: no,
+      name: cleanText_(rows[i][1], 40),
+      handle: cleanHandle_(rows[i][2]),
+      tagline: cleanText_(rows[i][3], 40),
+      photo: photoAddress_(rows[i][4]),
+    });
+  }
+  return list;
+}
+
+function cleanText_(value, max) {
+  return String(value === null || value === undefined ? '' : value)
+    .replace(/[\u0000-\u001f\u007f]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, max);
+}
+
+/** "@name" for a plausible Instagram handle, else ''. */
+function cleanHandle_(value) {
+  var handle = cleanText_(value, 40).replace(/^@/, '');
+  return /^[A-Za-z0-9._]{1,30}$/.test(handle) ? '@' + handle : '';
+}
+
+/** A Drive share link becomes Google's resized image address; any other https image address passes. */
+function photoAddress_(value) {
+  var text = cleanText_(value, 500);
+  if (text === '') return '';
+  var drive = /^https:\/\/(drive|docs)\.google\.com\//.test(text)
+    ? /\/d\/([A-Za-z0-9_-]{20,})/.exec(text) || /[?&]id=([A-Za-z0-9_-]{20,})/.exec(text)
+    : null;
+  if (drive !== null) return 'https://lh3.googleusercontent.com/d/' + drive[1] + '=w960';
+  if (/^https:\/\/[^\s"'<>]+$/.test(text)) return text;
+  if (LOCAL_PHOTOS_FOR_TESTS && /^http:\/\/127\.0\.0\.1:\d+\/[^\s"'<>]+$/.test(text)) return text;
+  return '';
 }
 
 // ---------------------------------------------------------------- helpers

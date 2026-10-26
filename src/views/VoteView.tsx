@@ -8,7 +8,8 @@ import {
   type FormEvent,
   type ReactNode,
 } from 'react';
-import { contestants, event } from '../../event.config';
+import { event } from '../../event.config';
+import { useContestants } from '../contestants';
 import { DemoVoterPanel } from '../demo/lazy';
 import { checkEmail, type EmailProblem } from '../domain/email';
 import { toVoteError, type VoteError } from '../domain/errors';
@@ -69,6 +70,7 @@ const EMAIL_PROBLEM: Record<EmailProblem, string> = {
  * to show; the server makes the decision and this page reports it.
  */
 export function VoteView({ store }: { store: VoteStore }): JSX.Element {
+  const contestants = useContestants();
   const storage = useMemo(() => browserStorage(), []);
   const [marker, setMarker] = useState<VoteMarker | null>(() => readVoteMarker(storage, event.id));
   const [cast, setCast] = useState<CastState>({ phase: 'idle' });
@@ -98,7 +100,7 @@ export function VoteView({ store }: { store: VoteStore }): JSX.Element {
   const canChange = session?.state.allowVoteChange === true;
   const canVote = status === 'open' && !sending && (!voted || canChange);
 
-  const byId = useMemo(() => new Map(contestants.map((c) => [c.id, c])), []);
+  const byId = useMemo(() => new Map(contestants.map((c) => [c.id, c])), [contestants]);
   const votedFor = marker === null ? undefined : byId.get(marker.contestantId);
   const tallies = useMemo(
     () => new Map((session?.tallies ?? []).map((tally) => [tally.contestantId, tally.votes])),

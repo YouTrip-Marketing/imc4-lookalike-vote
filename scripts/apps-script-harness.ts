@@ -65,11 +65,15 @@ export class FakeSheet {
 
 export interface AppsScriptRun {
   doPost(body: string): { status: number; json: unknown };
-  doGet(key?: string): { status: number; json: unknown };
+  doGet(key?: string, view?: string): { status: number; json: unknown };
   /** The Votes tab, or undefined before the first vote creates it. */
   votes(): FakeSheet | undefined;
   /** Simulates another request holding the script lock. */
   holdLock(held: boolean): void;
+  /** The pretend spreadsheet's tabs, e.g. to edit Contestants mid-test. */
+  tab(name: string): FakeSheet | undefined;
+  /** Empties the pretend CacheService. */
+  clearCache(): void;
   /** Calls a top-level function from Code.gs by name (e.g. canonicalEmail). */
   call(name: string, ...args: unknown[]): unknown;
 }
@@ -82,6 +86,10 @@ export interface AppsScriptOptions {
   window?: { opensAt: string; closesAt: string };
   /** Replaces ADMIN_KEY_SHA256 in the loaded copy with the hash of this test passcode. */
   adminKey?: string;
+  /** Rows for a "Contestants" tab (No., Name, Instagram handle, Tagline, Photo), header added. */
+  contestants?: (string | number)[][];
+  /** Lets http://127.0.0.1 photo addresses through (the e2e stub serves the photos). */
+  localPhotos?: boolean;
 }
 
 /** The real Code.gs constants, read from the file (for parity tests). */
@@ -93,6 +101,12 @@ export function codeGsConstant(name: string): string {
 
 export function loadAppsScript(options: AppsScriptOptions = {}): AppsScriptRun {
   const tabs = new Map<string, FakeSheet>();
+  const cache = new Map<string, string>();
+  if (options.contestants !== undefined) {
+    const sheet = new FakeSheet();
+    sheet.rows.push(['No.', 'Name', 'Instagram handle', 'Tagline', 'Photo'], ...options.contestants.map((row) => [...row]));
+    tabs.set('Contestants', sheet);
+  }
   let lockHeld = false;
   const RealDate = Date;
   const now = options.now ?? (() => new RealDate());
@@ -151,6 +165,14 @@ export function loadAppsScript(options: AppsScriptOptions = {}): AppsScriptRun {
       MimeType: { JSON: 'application/json' },
       createTextOutput: (text: string) => ({ text, setMimeType: () => ({ text }) }),
     },
+    CacheService: {
+      getScriptCache: () => ({
+        get: (key: string) => cache.get(key) ?? null,
+        put: (key: string, value: string) => {
+          cache.set(key, value);
+        },
+      }),
+    },
     Date: ScriptDate,
     JSON,
   };
@@ -165,6 +187,9 @@ export function loadAppsScript(options: AppsScriptOptions = {}): AppsScriptRun {
   source = source
     .replace(/^var OPENS_AT = '[^']*';/m, `var OPENS_AT = '${window.opensAt}';`)
     .replace(/^var CLOSES_AT = '[^']*';/m, `var CLOSES_AT = '${window.closesAt}';`);
+  if (options.localPhotos === true) {
+    source = source.replace(/^var LOCAL_PHOTOS_FOR_TESTS = false;/m, 'var LOCAL_PHOTOS_FOR_TESTS = true;');
+  }
   if (options.adminKey !== undefined) {
     const hash = createHash('sha256').update(options.adminKey, 'utf8').digest('hex');
     source = source.replace(/^var ADMIN_KEY_SHA256 = '[^']*';/m, `var ADMIN_KEY_SHA256 = '${hash}';`);
@@ -182,8 +207,11 @@ export function loadAppsScript(options: AppsScriptOptions = {}): AppsScriptRun {
 
   return {
     doPost: (body) => answer(fn('doPost')({ postData: { contents: body, type: 'text/plain' } })),
-    doGet: (key?: string) => answer(fn('doGet')({ parameter: key === undefined ? {} : { key } })),
+    doGet: (key?: string, view?: string) =>
+      answer(fn('doGet')({ parameter: { ...(key === undefined ? {} : { key }), ...(view === undefined ? {} : { view }) } })),
     votes: () => tabs.get('Votes'),
+    tab: (name) => tabs.get(name),
+    clearCache: () => cache.clear(),
     holdLock: (held) => {
       lockHeld = held;
     },

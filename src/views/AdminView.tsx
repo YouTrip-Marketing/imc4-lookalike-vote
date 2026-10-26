@@ -1,5 +1,6 @@
 import { Suspense, useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
-import { burstRule, contestants, event, sharedAddressRule } from '../../event.config';
+import { burstRule, event, sharedAddressRule } from '../../event.config';
+import { useContestants } from '../contestants';
 import { DemoAdminPanel } from '../demo/lazy';
 import { detectBursts, tallyVotes, volumeTimeline } from '../domain/analytics';
 import { auditCsv, tallyCsv, votesCsv } from '../domain/csv';
@@ -154,6 +155,7 @@ function Dashboard({
   passcode: string;
   onLocked: () => void;
 }): JSX.Element {
+  const contestants = useContestants();
   const [pending, setPending] = useState<Pending>(null);
   const [notice, setNotice] = useState<{ tone: 'good' | 'warn'; text: string } | null>(null);
 
@@ -165,7 +167,7 @@ function Dashboard({
     if (error?.code === 'bad_passcode') onLocked();
   }, [error, onLocked]);
 
-  const byId = useMemo(() => new Map(contestants.map((c) => [c.id, c])), []);
+  const byId = useMemo(() => new Map(contestants.map((c) => [c.id, c])), [contestants]);
 
   const derived = useMemo(() => {
     if (data === null) return null;
@@ -196,7 +198,7 @@ function Dashboard({
       // Counts and contestants only. The admin view never receives an address.
       sharedAddresses: data.sharedAddresses.filter((group) => group.votes >= sharedAddressRule.votes),
     };
-  }, [data]);
+  }, [data, contestants]);
 
   const act = async (kind: Exclude<Pending, null>, action: () => Promise<string>): Promise<void> => {
     setPending(kind);

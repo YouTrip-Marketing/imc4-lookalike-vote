@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { contestants, votingRules, votingWindow } from '../event.config';
 import { VoteError } from '../src/domain/errors';
 import { SheetVoteStore, deviceLabel, type SheetStoreOptions } from '../src/storage/sheetStore';
+import { mergeContestants } from '../src/contestants';
 import { loadAppsScript, type AppsScriptRun } from '../scripts/apps-script-harness';
 
 const ENDPOINT = 'https://script.google.com/macros/s/AKfycbTEST_id-123/exec';
@@ -13,8 +14,11 @@ const IG_UA =
 /** A fetch that hands each request to Code.gs, as the deployed web app would. */
 function fetchInto(script: AppsScriptRun) {
   return vi.fn(async (_url: string | URL | Request, init?: RequestInit) => {
-    const key = new URL(String(_url)).searchParams.get('key') ?? undefined;
-    const answer = init?.method === 'POST' ? script.doPost(String(init.body)) : script.doGet(key);
+    const params = new URL(String(_url)).searchParams;
+    const answer =
+      init?.method === 'POST'
+        ? script.doPost(String(init.body))
+        : script.doGet(params.get('key') ?? undefined, params.get('view') ?? undefined);
     return new Response(JSON.stringify(answer.json), { status: 200 });
   });
 }
@@ -217,6 +221,54 @@ describe('the self-reported IP (indicative only)', () => {
     await store({ fetch, ipLookupUrl: LOOKUP, ipTimeoutMs: 50 }).castVote('c07', 'a@example.com', 'req-0001-aaaa');
     expect(Date.now() - started).toBeLessThan(2000);
     expect(script.votes()?.rows[1]?.[3]).toBe('unavailable');
+  });
+});
+
+describe('the runtime Top 20', () => {
+  const rows: (string | number)[][] = [
+    [7, 'Kim Lookalike', 'kim.lookalike', 'Jurong West', 'https://example.com/07.jpg'],
+    [3, 'Ahmad', '', '', ''],
+  ];
+
+  it('is empty before the reveal, and the page keeps its placeholders', async () => {
+    const script = loadAppsScript({ contestants: rows, window: { opensAt: '2099-01-01T00:00:00Z', closesAt: '2099-01-02T00:00:00Z' } });
+    expect(await store({ fetch: fetchInto(script) }).getContestants()).toEqual({ revealed: false, contestants: [] });
+  });
+
+  it('after the reveal: lists the tab, and votes record the real name in the sheet', async () => {
+    const script = loadAppsScript({ contestants: rows });
+    const sheet = store({ fetch: fetchInto(script) });
+    const list = await sheet.getContestants();
+    expect(list.revealed).toBe(true);
+    expect(list.contestants).toEqual([
+      { number: 7, stageName: 'Kim Lookalike', handle: '@kim.lookalike', tagline: 'Jurong West', photo: 'https://example.com/07.jpg' },
+      { number: 3, stageName: 'Ahmad', handle: '', tagline: '', photo: '' },
+    ]);
+    await sheet.castVote('c07', 'a@example.com', 'req-0001-aaaa');
+    expect(script.votes()?.rows[1]?.[5]).toBe('Kim Lookalike');
+  });
+
+  it('drops anything malformed the sheet might send', async () => {
+    const fetch = vi.fn(async () =>
+      new Response(JSON.stringify({ ok: true, data: { revealed: true, contestants: [
+        { no: 99, name: 'x', handle: '', tagline: '', photo: '' },
+        { no: 5, name: 'Five', handle: 'bad handle', tagline: '', photo: 'javascript:alert(1)' },
+        'junk',
+      ] } })),
+    );
+    expect((await store({ fetch }).getContestants()).contestants).toEqual([
+      { number: 5, stageName: 'Five', handle: '', tagline: '', photo: '' },
+    ]);
+  });
+
+  it('merges field by field over the config, keeping ids and numbers', () => {
+    const merged = mergeContestants(contestants, [
+      { number: 7, stageName: 'Kim Lookalike', handle: '@kim', tagline: '', photo: 'https://example.com/07.jpg' },
+      { number: 3, stageName: '', handle: '', tagline: '', photo: '' },
+    ]);
+    expect(merged).toHaveLength(20);
+    expect(merged[6]).toMatchObject({ id: 'c07', number: 7, stageName: 'Kim Lookalike', handle: '@kim', photo: 'https://example.com/07.jpg' });
+    expect(merged[2]).toEqual(contestants[2]);
   });
 });
 

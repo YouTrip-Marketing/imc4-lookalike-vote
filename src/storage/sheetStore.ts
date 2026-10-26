@@ -7,7 +7,9 @@ import type {
   AdminVoteRow,
   AuditRow,
   Contestant,
+  ContestantDetails,
   ContestantId,
+  ContestantList,
   EventState,
   PublicSession,
   VoteReceipt,
@@ -120,6 +122,8 @@ export class SheetVoteStore implements VoteStore {
   private readonly byId: Map<ContestantId, Pick<Contestant, 'id' | 'number' | 'stageName'>>;
   private readonly byNumber: Map<number, ContestantId>;
   private ipLookup: Promise<string> | null = null;
+  /** Names from the Contestants tab, once revealed: they go into the Votes rows. */
+  private readonly revealedNames = new Map<number, string>();
 
   constructor(private readonly options: SheetStoreOptions) {
     const endpoint = options.endpoint.trim();
@@ -251,6 +255,34 @@ export class SheetVoteStore implements VoteStore {
     return { state: this.state(), tallies: null };
   }
 
+  /** The Contestants tab, from the reveal. Never throws for bad rows: they are dropped. */
+  async getContestants(): Promise<ContestantList> {
+    const data = await this.request({ method: 'GET' }, '?view=contestants');
+    const answer = (typeof data === 'object' && data !== null ? data : {}) as { revealed?: unknown; contestants?: unknown };
+    const rows = Array.isArray(answer.contestants) ? answer.contestants : [];
+    const text = (value: unknown, max: number): string => (typeof value === 'string' ? value.trim().slice(0, max) : '');
+    const contestants: ContestantDetails[] = [];
+    for (const row of rows) {
+      if (typeof row !== 'object' || row === null) continue;
+      const item = row as Record<string, unknown>;
+      const number = item.no;
+      if (typeof number !== 'number' || !this.byNumber.has(number)) continue;
+      const photo = text(item.photo, 500);
+      contestants.push({
+        number,
+        stageName: text(item.name, 40),
+        handle: /^@[A-Za-z0-9._]{1,30}$/.test(text(item.handle, 31)) ? text(item.handle, 31) : '',
+        tagline: text(item.tagline, 40),
+        photo: /^https:\/\/[^\s"'<>]+$|^http:\/\/127\.0\.0\.1:\d+\/[^\s"'<>]+$/.test(photo) ? photo : '',
+      });
+    }
+    const revealed = answer.revealed === true;
+    if (revealed) {
+      for (const c of contestants) if (c.stageName !== '') this.revealedNames.set(c.number, c.stageName);
+    }
+    return { revealed, contestants: revealed ? contestants : [] };
+  }
+
   async castVote(contestantId: ContestantId, email: string, requestId: string): Promise<VoteReceipt> {
     const contestant = this.byId.get(contestantId);
     if (contestant === undefined) throw new VoteError('invalid_vote');
@@ -263,7 +295,7 @@ export class SheetVoteStore implements VoteStore {
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       body: JSON.stringify({
         contestantNumber: contestant.number,
-        contestantName: contestant.stageName,
+        contestantName: this.revealedNames.get(contestant.number) ?? contestant.stageName,
         email: email.trim(),
         voteId: requestId,
         device: this.device,
