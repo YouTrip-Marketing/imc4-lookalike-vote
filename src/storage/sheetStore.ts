@@ -122,6 +122,8 @@ export class SheetVoteStore implements VoteStore {
   private readonly byId: Map<ContestantId, Pick<Contestant, 'id' | 'number' | 'stageName'>>;
   private readonly byNumber: Map<number, ContestantId>;
   private ipLookup: Promise<string> | null = null;
+  readonly supportsOrganiserTest = true;
+  private organiserKey: string | null = null;
   /** Names from the Contestants tab, once revealed: they go into the Votes rows. */
   private readonly revealedNames = new Map<number, string>();
 
@@ -178,10 +180,19 @@ export class SheetVoteStore implements VoteStore {
     return this.ipLookup;
   }
 
+  setOrganiserKey(key: string | null): void {
+    this.organiserKey = key === null || key.trim() === '' ? null : key;
+  }
+
+  get organiserMode(): boolean {
+    return this.organiserKey !== null;
+  }
+
   private state(): EventState {
     const now = this.now();
     return {
-      status: this.isDemo ? 'open' : effectiveStatus('pending', this.options.window, now),
+      // An organiser test is open at any time; Code.gs checks the passcode.
+      status: this.isDemo || this.organiserKey !== null ? 'open' : effectiveStatus('pending', this.options.window, now),
       adminStatus: this.isDemo ? 'open' : 'pending',
       opensAt: this.options.window.opensAt,
       closesAt: this.options.window.closesAt,
@@ -257,7 +268,11 @@ export class SheetVoteStore implements VoteStore {
 
   /** The Contestants tab, from the reveal. Never throws for bad rows: they are dropped. */
   async getContestants(): Promise<ContestantList> {
-    const data = await this.request({ method: 'GET' }, '?view=contestants');
+    const key = this.organiserKey;
+    const data = await this.request(
+      { method: 'GET' },
+      key === null ? '?view=contestants' : `?view=contestants&key=${encodeURIComponent(key)}`,
+    );
     const answer = (typeof data === 'object' && data !== null ? data : {}) as { revealed?: unknown; contestants?: unknown };
     const rows = Array.isArray(answer.contestants) ? answer.contestants : [];
     const text = (value: unknown, max: number): string => (typeof value === 'string' ? value.trim().slice(0, max) : '');
@@ -277,10 +292,12 @@ export class SheetVoteStore implements VoteStore {
       });
     }
     const revealed = answer.revealed === true;
-    if (revealed) {
+    // Before the reveal only an organiser (passcode) gets a list: a preview.
+    const preview = !revealed && key !== null && contestants.length > 0;
+    if (revealed || preview) {
       for (const c of contestants) if (c.stageName !== '') this.revealedNames.set(c.number, c.stageName);
     }
-    return { revealed, contestants: revealed ? contestants : [] };
+    return { revealed, preview, contestants: revealed || preview ? contestants : [] };
   }
 
   async castVote(contestantId: ContestantId, email: string, requestId: string): Promise<VoteReceipt> {
@@ -300,6 +317,7 @@ export class SheetVoteStore implements VoteStore {
         voteId: requestId,
         device: this.device,
         ip,
+        ...(this.organiserKey === null ? {} : { adminKey: this.organiserKey }),
       }),
     });
     const answer = (typeof data === 'object' && data !== null ? data : {}) as {

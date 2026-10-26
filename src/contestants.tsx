@@ -60,10 +60,17 @@ function writeCache(details: readonly ContestantDetails[]): void {
   }
 }
 
-const ContestantsContext = createContext<readonly Contestant[]>(configured);
+interface ContestantsValue {
+  list: readonly Contestant[];
+  /** Ask again now (after organiser test mode switches on). */
+  refresh: () => void;
+}
+
+const ContestantsContext = createContext<ContestantsValue>({ list: configured, refresh: () => undefined });
 
 export function ContestantsProvider({ store, children }: { store: VoteStore; children: ReactNode }): JSX.Element {
   const [details, setDetails] = useState<ContestantDetails[]>(() => (store.getContestants === undefined ? [] : readCache()));
+  const [round, setRound] = useState(0);
 
   useEffect(() => {
     if (store.getContestants === undefined) return undefined;
@@ -74,10 +81,11 @@ export function ContestantsProvider({ store, children }: { store: VoteStore; chi
       try {
         const list = await store.getContestants!();
         if (cancelled) return;
-        if (list.revealed && list.contestants.length > 0) {
+        if ((list.revealed || list.preview === true) && list.contestants.length > 0) {
           setDetails([...list.contestants]);
-          writeCache(list.contestants);
-          next = REFRESH_MS;
+          // An organiser preview stays in this tab only: never cached for later visits.
+          if (list.revealed) writeCache(list.contestants);
+          if (list.revealed) next = REFRESH_MS;
         }
       } catch {
         // Keep what is on screen and try again later.
@@ -89,12 +97,19 @@ export function ContestantsProvider({ store, children }: { store: VoteStore; chi
       cancelled = true;
       if (timer !== undefined) clearTimeout(timer);
     };
-  }, [store]);
+  }, [store, round]);
 
-  const list = useMemo(() => mergeContestants(configured, details), [details]);
-  return <ContestantsContext.Provider value={list}>{children}</ContestantsContext.Provider>;
+  const value = useMemo(
+    () => ({ list: mergeContestants(configured, details), refresh: () => setRound((n) => n + 1) }),
+    [details],
+  );
+  return <ContestantsContext.Provider value={value}>{children}</ContestantsContext.Provider>;
 }
 
 export function useContestants(): readonly Contestant[] {
-  return useContext(ContestantsContext);
+  return useContext(ContestantsContext).list;
+}
+
+export function useRefreshContestants(): () => void {
+  return useContext(ContestantsContext).refresh;
 }

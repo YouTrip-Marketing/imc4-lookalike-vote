@@ -232,7 +232,7 @@ describe('the runtime Top 20', () => {
 
   it('is empty before the reveal, and the page keeps its placeholders', async () => {
     const script = loadAppsScript({ contestants: rows, window: { opensAt: '2099-01-01T00:00:00Z', closesAt: '2099-01-02T00:00:00Z' } });
-    expect(await store({ fetch: fetchInto(script) }).getContestants()).toEqual({ revealed: false, contestants: [] });
+    expect(await store({ fetch: fetchInto(script) }).getContestants()).toEqual({ revealed: false, preview: false, contestants: [] });
   });
 
   it('after the reveal: lists the tab, and votes record the real name in the sheet', async () => {
@@ -269,6 +269,51 @@ describe('the runtime Top 20', () => {
     expect(merged).toHaveLength(20);
     expect(merged[6]).toMatchObject({ id: 'c07', number: 7, stageName: 'Kim Lookalike', handle: '@kim', photo: 'https://example.com/07.jpg' });
     expect(merged[2]).toEqual(contestants[2]);
+  });
+});
+
+describe('organiser test mode (26 Oct 2026)', () => {
+  const before = { opensAt: '2099-01-01T00:00:00Z', closesAt: '2099-01-02T00:00:00Z' };
+  const config = { opensAt: '2099-01-01T00:00:00+08:00', closesAt: '2099-01-02T00:00:00+08:00', autoOpen: true };
+
+  it('is off by default: closed before the window, and the sheet refuses', async () => {
+    const script = loadAppsScript({ window: before, adminKey: ADMIN });
+    const sheet = store({ fetch: fetchInto(script), window: config });
+    expect(sheet.organiserMode).toBe(false);
+    expect((await sheet.getSession()).state.status).toBe('not_open');
+    expect((await rejection(sheet.castVote('c07', 'a@example.com', 'req-0001-aaaa'))).code).toBe('voting_not_open');
+  });
+
+  it('with the passcode: open now, the vote carries it, and the row is marked as a test', async () => {
+    const script = loadAppsScript({ window: before, adminKey: ADMIN });
+    const fetch = fetchInto(script);
+    const sheet = store({ fetch, window: config });
+    sheet.setOrganiserKey(ADMIN);
+    expect(sheet.organiserMode).toBe(true);
+    expect((await sheet.getSession()).state.status).toBe('open');
+    await sheet.castVote('c07', 'kel@example.com', 'req-0001-aaaa');
+    expect(JSON.parse(String(fetch.mock.calls.at(-1)?.[1]?.body)).adminKey).toBe(ADMIN);
+    expect(script.votes()?.rows[1]?.[9]).toBe(true);
+    sheet.setOrganiserKey(null);
+    expect(sheet.organiserMode).toBe(false);
+  });
+
+  it('previews the Top 20 before the reveal, flagged as a preview', async () => {
+    const script = loadAppsScript({ window: before, adminKey: ADMIN, contestants: [[7, 'Kim Lookalike', '', '', '']] });
+    const sheet = store({ fetch: fetchInto(script), window: config });
+    expect((await sheet.getContestants()).contestants).toEqual([]);
+    sheet.setOrganiserKey(ADMIN);
+    const list = await sheet.getContestants();
+    expect(list).toMatchObject({ revealed: false, preview: true });
+    expect(list.contestants[0]?.stageName).toBe('Kim Lookalike');
+  });
+
+  it('a wrong passcode gains nothing: the sheet still refuses outside the window', async () => {
+    const script = loadAppsScript({ window: before, adminKey: ADMIN });
+    const sheet = store({ fetch: fetchInto(script), window: config });
+    sheet.setOrganiserKey('guessed');
+    expect((await rejection(sheet.castVote('c07', 'a@example.com', 'req-0001-aaaa'))).code).toBe('voting_not_open');
+    expect(script.votes()).toBeUndefined();
   });
 });
 

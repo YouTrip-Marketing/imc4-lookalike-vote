@@ -1,6 +1,7 @@
 import { Suspense, useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
 import { burstRule, event, sharedAddressRule } from '../../event.config';
 import { useContestants } from '../contestants';
+import { recallPasscode, rememberPasscode } from '../organiser';
 import { DemoAdminPanel } from '../demo/lazy';
 import { detectBursts, tallyVotes, volumeTimeline } from '../domain/analytics';
 import { auditCsv, tallyCsv, votesCsv } from '../domain/csv';
@@ -13,24 +14,6 @@ import { hasDemoControls, type VoteStore } from '../storage';
 import { Brand, Message, Spinner, StatusPill } from '../ui/common';
 import { VolumeChart } from '../ui/VolumeChart';
 
-const SESSION_KEY = 'imc4-admin-passcode';
-
-function rememberPasscode(passcode: string | null): void {
-  try {
-    if (passcode === null) window.sessionStorage.removeItem(SESSION_KEY);
-    else window.sessionStorage.setItem(SESSION_KEY, passcode);
-  } catch {
-    // Storage blocked: the admin just re-enters the passcode after a reload.
-  }
-}
-
-function recallPasscode(): string | null {
-  try {
-    return window.sessionStorage.getItem(SESSION_KEY);
-  } catch {
-    return null;
-  }
-}
 
 function downloadCsv(filename: string, csv: string): void {
   // The BOM makes Excel read the file as UTF-8, so stage names with accents survive.
@@ -62,9 +45,16 @@ export function AdminView({ store }: { store: VoteStore }): JSX.Element {
       <div className="admin__top">
         <Brand />
         {passcode !== null && (
-          <button type="button" className="button button--ghost" onClick={lock}>
-            Lock
-          </button>
+          <span className="admin__top-actions">
+            {store.supportsOrganiserTest === true && (
+              <a className="button button--ghost" href="#/">
+                Cast a test vote
+              </a>
+            )}
+            <button type="button" className="button button--ghost" onClick={lock}>
+              Lock
+            </button>
+          </span>
         )}
       </div>
       <h1>Voting admin</h1>

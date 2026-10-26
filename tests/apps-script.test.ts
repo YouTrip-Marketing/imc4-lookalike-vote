@@ -65,11 +65,11 @@ describe('Code.gs doPost', () => {
     expect(sheet?.rows).toEqual([
       [
         'Timestamp (SGT)', 'Email (as typed)', 'Canonical email', 'IP (self-reported)', 'Contestant no.',
-        'Contestant name', 'Vote ID', 'User agent (short)', 'Duplicate?',
+        'Contestant name', 'Vote ID', 'User agent (short)', 'Duplicate?', 'Organiser test?',
       ],
       [
         '2026-10-13 14:30:00', 'test+1@example.com', 'test+1@example.com', '203.0.113.5', 7,
-        'Contestant 7', 'vote-0001-aaaa', 'iPhone · Instagram', false,
+        'Contestant 7', 'vote-0001-aaaa', 'iPhone · Instagram', false, false,
       ],
     ]);
   });
@@ -289,5 +289,46 @@ describe('Code.gs Contestants tab (runtime Top 20, 26 Oct 2026)', () => {
   it('answers an empty list when there is no Contestants tab', () => {
     const script = loadAppsScript({ now: () => new Date('2026-11-03T09:00:00+08:00'), window });
     expect(list(script.doGet(undefined, 'contestants').json)).toEqual({ revealed: true, contestants: [] });
+  });
+});
+
+describe('Code.gs organiser test votes (26 Oct 2026)', () => {
+  const window = { opensAt: '2026-11-02T12:00:00+08:00', closesAt: '2026-11-05T23:59:00+08:00' };
+  const today = () => loadAppsScript({ now: () => new Date('2026-10-26T15:00:00+08:00'), window, adminKey: ADMIN });
+  const ok = (json: unknown) => json as { ok: boolean; data?: { duplicate: boolean }; error?: string };
+
+  it('accepts a passcode vote before the window and marks its row Organiser test? = TRUE', () => {
+    const script = today();
+    expect(ok(script.doPost(vote({ adminKey: ADMIN })).json).data?.duplicate).toBe(false);
+    const row = script.votes()?.rows[1];
+    expect([row?.[8], row?.[9]]).toEqual([false, true]);
+  });
+
+  it('refuses the same vote without the passcode, and with a wrong or demo one', () => {
+    for (const adminKey of [undefined, 'wrong', 'demo-admin']) {
+      expect(ok(today().doPost(vote({ adminKey })).json).error).toBe('voting_not_open');
+    }
+  });
+
+  it('keeps test rows out of the tally', () => {
+    const script = loadAppsScript({ now: () => new Date('2026-11-03T09:00:00+08:00'), window, adminKey: ADMIN });
+    script.doPost(vote({ email: 'real@example.com', voteId: 'vote-0001-real', contestantNumber: 3 }));
+    script.doPost(vote({ email: 'test@example.com', voteId: 'vote-0002-test', contestantNumber: 7, adminKey: ADMIN }));
+    const votes = (script.doGet(ADMIN).json as { data: { votes: { no: number }[] } }).data.votes;
+    expect(votes.map((v) => v.no)).toEqual([3]);
+  });
+
+  it("a test vote never blocks that email's real vote; tests repeat-check among tests only", () => {
+    const script = loadAppsScript({ now: () => new Date('2026-11-03T09:00:00+08:00'), window, adminKey: ADMIN });
+    expect(ok(script.doPost(vote({ email: 'kel@example.com', voteId: 'vote-0001-test', adminKey: ADMIN })).json).data?.duplicate).toBe(false);
+    expect(ok(script.doPost(vote({ email: 'kel@example.com', voteId: 'vote-0002-test', adminKey: ADMIN })).json).data?.duplicate).toBe(true);
+    expect(ok(script.doPost(vote({ email: 'kel@example.com', voteId: 'vote-0003-real' })).json).data?.duplicate).toBe(false);
+    expect(ok(script.doPost(vote({ email: 'kel@example.com', voteId: 'vote-0004-real' })).json).data?.duplicate).toBe(true);
+    expect(script.votes()?.rows.slice(1).map((r) => [r[8], r[9]])).toEqual([
+      [false, true],
+      [true, true],
+      [false, false],
+      [true, false],
+    ]);
   });
 });

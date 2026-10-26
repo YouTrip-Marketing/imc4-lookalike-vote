@@ -232,5 +232,7 @@ export interface ContestantDetails {
 export interface ContestantList {
   /** false before the reveal: the list is empty and the page keeps its placeholders. */
   revealed: boolean;
+  /** true when an organiser sees the list early (admin passcode). Never cached. */
+  preview?: boolean;
   contestants: readonly ContestantDetails[];
 }

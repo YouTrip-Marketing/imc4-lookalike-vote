@@ -61,6 +61,17 @@ export interface VoteStore {
    */
   getContestants?(): Promise<ContestantList>;
 
+  /** True when organiser test votes are possible (the sheet store). */
+  readonly supportsOrganiserTest?: boolean;
+  /**
+   * Organiser test mode (sheet store): with the admin passcode set, votes are
+   * sent with it, voting shows as open, and the Top 20 can be previewed.
+   * null switches it off.
+   */
+  setOrganiserKey?(key: string | null): void;
+  /** True while organiser test mode is on. */
+  readonly organiserMode?: boolean;
+
   /**
    * Push-style change notification, where the backend has one. Views also poll,
    * so an implementation with nothing to push may return a no-op unsubscribe.

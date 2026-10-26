@@ -792,7 +792,7 @@ cd dist-prod && git add -A && git commit -m "Publish voting site" && git push ht
 
 ### 3. Check, then clean up
 1. Open the URL: no banner, "Voting opens soon", Mon 2 Nov 12:00pm SGT.
-2. One organiser test vote (outside the window it needs the admin passcode, which the page never sends): POST to the `/exec` URL with `adminKey`, e.g. from `scripts/` or curl. Confirm the row in **Votes** and the **Tally**, then delete that row.
+2. **Organiser test vote, any time (no tools needed):** open `#/admin`, unlock with the passcode, tap **Cast a test vote**. In that same tab the voting page shows an amber **ORGANISER TEST** bar, is open, and previews the Contestants tab. Vote with any email. The row lands in **Votes** with **Organiser test? = TRUE** (shaded amber); the Tally leaves it out and counts it under "Organiser test rows". A test vote never blocks that email's real vote, and it leaves no "I voted" note on the phone. Delete test rows whenever convenient. Closing the tab or **Lock** ends organiser mode. (`scripts/organiser-test-vote.ts` does the same from the terminal.)
 3. `#/admin` with the passcode: the tally loads.
 
 ### Known limits

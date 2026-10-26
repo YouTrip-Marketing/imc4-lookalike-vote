@@ -9,7 +9,8 @@ import {
   type ReactNode,
 } from 'react';
 import { event } from '../../event.config';
-import { useContestants } from '../contestants';
+import { useContestants, useRefreshContestants } from '../contestants';
+import { recallPasscode } from '../organiser';
 import { DemoVoterPanel } from '../demo/lazy';
 import { checkEmail, type EmailProblem } from '../domain/email';
 import { toVoteError, type VoteError } from '../domain/errors';
@@ -71,6 +72,16 @@ const EMAIL_PROBLEM: Record<EmailProblem, string> = {
  */
 export function VoteView({ store }: { store: VoteStore }): JSX.Element {
   const contestants = useContestants();
+  const refreshContestants = useRefreshContestants();
+  // ORGANISER TEST: #/admin was unlocked in this tab. Set before the first load.
+  const organiser = useMemo(() => {
+    if (store.setOrganiserKey === undefined) return false;
+    store.setOrganiserKey(recallPasscode());
+    return store.organiserMode === true;
+  }, [store]);
+  useEffect(() => {
+    if (organiser) refreshContestants();
+  }, [organiser, refreshContestants]);
   const storage = useMemo(() => browserStorage(), []);
   const [marker, setMarker] = useState<VoteMarker | null>(() => readVoteMarker(storage, event.id));
   const [cast, setCast] = useState<CastState>({ phase: 'idle' });
@@ -156,7 +167,9 @@ export function VoteView({ store }: { store: VoteStore }): JSX.Element {
           },
         );
         const next = { contestantId: receipt.contestantId, votedAt: receipt.castAt };
-        writeVoteMarker(storage, event.id, next);
+        // An organiser test leaves no "I voted" note in the browser, so the
+        // phone is clean for the real vote on 2 Nov.
+        if (!organiser) writeVoteMarker(storage, event.id, next);
         setMarker(next);
         setEmail('');
         setCast({ phase: 'counted', replaced: receipt.replaced });
@@ -173,7 +186,7 @@ export function VoteView({ store }: { store: VoteStore }): JSX.Element {
         setCast({ phase: 'failed', error, contestant, email: address, requestId });
       }
     },
-    [store, storage],
+    [store, storage, organiser],
   );
 
   const confirm = (formEvent: FormEvent<HTMLFormElement>, contestant: Contestant): void => {
@@ -224,7 +237,7 @@ export function VoteView({ store }: { store: VoteStore }): JSX.Element {
   if (session === null) {
     const error = polled.error;
     return (
-      <VoteShell demoPanel={demoPanel}>
+      <VoteShell demoPanel={demoPanel} organiser={organiser}>
         {error === null ? (
           <Spinner label="Loading the contestants" />
         ) : error.code === 'unreachable' ? (
@@ -274,7 +287,7 @@ export function VoteView({ store }: { store: VoteStore }): JSX.Element {
     : 'One vote per person. It cannot be changed once you confirm.';
 
   return (
-    <VoteShell status={status} offline={polled.error !== null} demoPanel={demoPanel}>
+    <VoteShell status={status} offline={polled.error !== null} demoPanel={demoPanel} organiser={organiser}>
       <header ref={intro} className="voter__intro">
         <h1>
           {sending
@@ -504,16 +517,24 @@ function VoteShell({
   status,
   offline = false,
   demoPanel,
+  organiser = false,
 }: {
   children: ReactNode;
   status?: VotingStatus;
   offline?: boolean;
   demoPanel: ReactNode;
+  organiser?: boolean;
 }): JSX.Element {
   // Revision 10: the key visual sits outside the padded column, edge to edge,
   // and the brand line under it is gone (the key visual carries the title).
   return (
     <>
+      {organiser && (
+        <div className="demo-banner demo-banner--organiser" role="note">
+          <strong>ORGANISER TEST</strong>
+          <span>Votes are marked as tests and left out of the Tally.</span>
+        </div>
+      )}
       <KeyVisualBanner />
       <main className="voter">
         {status !== undefined && (

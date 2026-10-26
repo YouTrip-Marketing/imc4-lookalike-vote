@@ -794,6 +794,45 @@ async function partD(
     await admin.close();
   });
 
+  await step('ORGANISER TEST before 2 Nov: unlock #/admin, "Cast a test vote", vote, row marked as a test', async () => {
+    const tab = await open(await browser.createBrowserContext(), `${closedSite}${PAGES_BASE}#/admin`);
+    await tab.waitForSelector('#passcode');
+    await tab.type('#passcode', SHEET_ADMIN);
+    await press(tab, 'Unlock');
+    await see(tab, 'Tally and ranking');
+    await tab.click('a[href="#/"]');
+    await see(tab, 'ORGANISER TEST');
+    await see(tab, 'Votes are marked as tests and left out of the Tally.');
+    await see(tab, OPEN_H1);
+    // The Top 20 preview: the tab's names before the reveal, for the organiser only.
+    await see(tab, 'Dry Run 07');
+    await shot(tab, 'prod-sheet-390-4-organiser-test');
+    await pickCard(tab, 7);
+    await see(tab, 'Vote for #7 Dry Run 07?');
+    await typeEmail(tab, 'Organiser.Test@Example.com');
+    await press(tab, 'Confirm vote', 'dialog.sheet');
+    await see(tab, 'Done. Your vote is counted.');
+    const rows = closedStub.script.votes()?.rows.slice(1) ?? [];
+    assert.equal(rows.length, 1);
+    assert.deepEqual([rows[0]?.[4], rows[0]?.[5], rows[0]?.[8], rows[0]?.[9]], [7, 'Dry Run 07', false, true]);
+    const marker = await tab.evaluate(() => Object.keys(localStorage).filter((key) => key.startsWith('imc4-voted')));
+    assert.deepEqual(marker, [], 'an organiser test left an "I voted" note in the browser');
+    await press(tab, 'Close', 'dialog.sheet--promo');
+    await shot(tab, 'prod-sheet-390-5-organiser-voted');
+    await tab.close();
+  });
+
+  await step('ORGANISER TEST: the public page stays closed, with placeholders, and the test is not in the tally', async () => {
+    const page = await open(await browser.createBrowserContext(), `${closedSite}${PAGES_BASE}`);
+    await see(page, 'Voting opens soon');
+    assert.equal(await cardsDisabled(page), true);
+    const body = await text(page);
+    assert.equal(/ORGANISER TEST|Dry Run/.test(body), false);
+    await page.close();
+    const tally = closedStub.script.doGet(SHEET_ADMIN).json as { data: { votes: unknown[] } };
+    assert.deepEqual(tally.data.votes, []);
+  });
+
   const context = await browser.createBrowserContext();
   const voter = await open(context, `${openSite}${PAGES_BASE}`);
 

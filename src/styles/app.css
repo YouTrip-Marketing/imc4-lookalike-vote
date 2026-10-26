@@ -1494,3 +1494,16 @@ main.voter {
 .app:has(.demo-banner) main.voter {
   scroll-margin-top: 36px;
 }
+
+/* Organiser test mode (26 Oct 2026): unmistakably not the public page. */
+.demo-banner--organiser {
+  background: #ffc46b;
+  color: #12003c;
+}
+
+.admin__top-actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}

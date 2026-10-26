@@ -37,9 +37,12 @@
  * Voting window, enforced here whatever the page says: a vote before OPENS_AT
  * is refused with voting_not_open, from CLOSES_AT on with voting_closed. Both
  * must match votingWindow in event.config.ts (a unit test checks). One
- * exception: a POST carrying the admin passcode as adminKey is accepted outside
- * the window, so the organisers can cast a test vote before launch (and delete
- * its row). The page never sends adminKey.
+ * exception, ORGANISER TEST votes: a POST carrying the admin passcode as
+ * adminKey is accepted at any time and its row is marked Organiser test? = TRUE.
+ * The page sends adminKey only in the browser tab where #/admin was unlocked.
+ * Test rows are left out of the Tally and doGet, are checked for repeats only
+ * against other test rows, and never stop that email's real vote. Delete them
+ * whenever convenient.
  *
  * IP (self-reported): Apps Script cannot see the voter's IP address, so the
  * page looks up its own public IP and sends it. INDICATIVE ONLY: anyone can
@@ -71,10 +74,10 @@ var CONTESTANT_COUNT = 20;
 var TIME_ZONE = 'Asia/Singapore';
 var HEADER = [
   'Timestamp (SGT)', 'Email (as typed)', 'Canonical email', 'IP (self-reported)', 'Contestant no.',
-  'Contestant name', 'Vote ID', 'User agent (short)', 'Duplicate?',
+  'Contestant name', 'Vote ID', 'User agent (short)', 'Duplicate?', 'Organiser test?',
 ];
-var COLUMN = { time: 0, typed: 1, counted: 2, ip: 3, number: 4, name: 5, voteId: 6, device: 7, duplicate: 8 };
-var FORMATS = ['@', '@', '@', '@', '0', '@', '@', '@', 'General'];
+var COLUMN = { time: 0, typed: 1, counted: 2, ip: 3, number: 4, name: 5, voteId: 6, device: 7, duplicate: 8, test: 9 };
+var FORMATS = ['@', '@', '@', '@', '0', '@', '@', '@', 'General', 'General'];
 
 // ------------------------------------------------------------------ email rule
 // Copy of checkEmail + canonicalEmail in src/domain/email.ts. Keep them identical.
@@ -151,7 +154,8 @@ function doPost(e) {
   var counted = canonicalEmail(vote.email);
   if (counted === null) return reply_({ ok: false, error: 'invalid_email' });
 
-  if (!isAdmin_(vote.adminKey)) {
+  var organiser = isAdmin_(vote.adminKey);
+  if (!organiser) {
     var now0 = new Date().getTime();
     if (now0 < new Date(OPENS_AT).getTime()) return reply_({ ok: false, error: 'voting_not_open' });
     if (now0 >= new Date(CLOSES_AT).getTime()) return reply_({ ok: false, error: 'voting_closed' });
@@ -174,7 +178,11 @@ function doPost(e) {
             : { ok: true, data: { duplicate: false, castAt: isoTime_(row[COLUMN.time]), row: i + 2 } },
         );
       }
-      if (row[COLUMN.duplicate] !== true && plain_(row[COLUMN.counted]) === counted) duplicate = true;
+      // Real votes are checked against real votes, organiser tests against tests.
+      var rowIsTest = row[COLUMN.test] === true;
+      if (row[COLUMN.duplicate] !== true && rowIsTest === organiser && plain_(row[COLUMN.counted]) === counted) {
+        duplicate = true;
+      }
     }
 
     var now = new Date();
@@ -189,6 +197,7 @@ function doPost(e) {
       voteId,
       safe_(text_(vote.device, 80)),
       duplicate,
+      organiser,
     ];
     sheet.getRange(rowNumber, 1, 1, HEADER.length).setNumberFormats([FORMATS]).setValues([values]);
     SpreadsheetApp.flush();
@@ -214,7 +223,7 @@ function doGet(e) {
   for (var i = 0; i < rows.length; i += 1) {
     var row = rows[i];
     var number = Number(row[COLUMN.number]);
-    if (!(number >= 1) || row[COLUMN.duplicate] === true) continue;
+    if (!(number >= 1) || row[COLUMN.duplicate] === true || row[COLUMN.test] === true) continue;
     votes.push({
       n: i + 1,
       no: number,
