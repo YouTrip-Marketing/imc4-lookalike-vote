@@ -8,6 +8,7 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "build:prod": "npm run check:deploy && tsc --noEmit && vite build --outDir dist-prod",
+    "build:prod:cf": "npm run check:deploy && tsc --noEmit && vite build --outDir dist-prod-cf && cp deploy/cloudflare/_headers dist-prod-cf/_headers",
     "build:sheet-test": "tsc --noEmit && vite build --mode sheet-test",
     "build:edge": "tsx scripts/build-edge-function.ts",
     "check:deploy": "tsx scripts/check-deploy.ts",

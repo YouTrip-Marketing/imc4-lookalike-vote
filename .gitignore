@@ -2,6 +2,8 @@ node_modules/
 dist/
 # Production build for YouTrip-Marketing/imc4-lookalike-vote (own nested git repo, gh-pages).
 dist-prod/
+# Production build for Cloudflare Pages (youtrip-lookalike-vote.pages.dev), deployed with wrangler.
+dist-prod-cf/
 .env
 .env.local
 .env.*.local

@@ -772,6 +772,20 @@ either removed paragraph comes back.
 
 **Admin passcode:** only its SHA-256 is in Code.gs (`ADMIN_KEY_SHA256`); the passcode itself is in `developer/outbox/imc4-voting-site-ADMIN-PASSCODE.txt` (gitignored) and never in the page. `#/admin` sends it to Code.gs, which answers the tally only to the right passcode.
 
+### Two hosts (26 Oct 2026)
+The same production build is served from two places. Both talk to the same Code.gs and the same sheet, so a vote counts the same from either.
+
+| Host | Address | Role | Build | Redeploy |
+|---|---|---|---|---|
+| **Cloudflare Pages** | https://youtrip-lookalike-vote.pages.dev | **Canonical: the only address in comms** | `npm run build:prod:cf` writes `dist-prod-cf/`, adds `deploy/cloudflare/_headers` | `npm run build:prod:cf && npx wrangler pages deploy dist-prod-cf --project-name youtrip-lookalike-vote --branch production` |
+| GitHub Pages | https://youtrip-marketing.github.io/imc4-lookalike-vote/ | Backup, kept live | `npm run build:prod` writes `dist-prod/` | `npm run build:prod && touch dist-prod/.nojekyll && cd dist-prod && git add -A && git commit -m "Publish" && git push https://github.com/YouTrip-Marketing/imc4-lookalike-vote.git gh-pages:gh-pages` |
+
+- Both builds run the same `check:deploy` gate first, and the bundles are identical. Vite's base is `./`, so one build works at a domain root and under `/imc4-lookalike-vote/`.
+- Routing is by hash (`#/admin`), so Cloudflare needs no `_redirects` file.
+- `_headers` repeats the page's robots-noindex and no-referrer meta tags as headers. It adds nosniff, frame denial and a restrictive Permissions-Policy, and caches `assets/*` for a year, since those files are content-hashed. There is no CSP on either host.
+- **Publish both hosts after every change**, so they never drift.
+- **Wrangler gotcha (4.152.0):** when wrangler detects an AI agent, `pages project create` and a first `pages deploy` to a NEW project are redirected to Cloudflare Workers. That path fails on this project (Vite 5). A person running the command in their own terminal, or any deploy to a project that already exists, goes straight to Pages.
+
 ### 1. Kelicia: deploy Code.gs (once, in the browser)
 Paste the CURRENT `apps-script/Code.gs`: it changed on 26 Oct (window, admin passcode).
 1. Open the **"Voting site"** spreadsheet (https://docs.google.com/spreadsheets/d/1ir3Umrw3Xq_ImhOA08Qcdj4aXD06LRuJSoDvCFLMqKI), NOT the 13 Oct test sheet. **Extensions > Apps Script** from inside it.
