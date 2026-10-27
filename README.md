@@ -777,13 +777,14 @@ The same production build is served from two places. Both talk to the same Code.
 
 | Host | Address | Role | Build | Redeploy |
 |---|---|---|---|---|
-| **Cloudflare Pages** | https://youtrip-lookalike-vote.pages.dev | **Canonical: the only address in comms** | `npm run build:prod:cf` writes `dist-prod-cf/`, adds `deploy/cloudflare/_headers` | `npm run build:prod:cf && npx wrangler pages deploy dist-prod-cf --project-name youtrip-lookalike-vote --branch production` |
+| **Cloudflare Pages** | https://youtrip-lookalike-vote.pages.dev | **Canonical: the only address in comms** | `npm run build:prod:cf` writes `dist-prod-cf/`, adds `deploy/cloudflare/_headers` | `npm run build:prod:cf && npx wrangler pages deploy dist-prod-cf --project-name youtrip-lookalike-vote --branch main` |
 | GitHub Pages | https://youtrip-marketing.github.io/imc4-lookalike-vote/ | Backup, kept live | `npm run build:prod` writes `dist-prod/` | `npm run build:prod && touch dist-prod/.nojekyll && cd dist-prod && git add -A && git commit -m "Publish" && git push https://github.com/YouTrip-Marketing/imc4-lookalike-vote.git gh-pages:gh-pages` |
 
 - Both builds run the same `check:deploy` gate first, and the bundles are identical. Vite's base is `./`, so one build works at a domain root and under `/imc4-lookalike-vote/`.
 - Routing is by hash (`#/admin`), so Cloudflare needs no `_redirects` file.
 - `_headers` repeats the page's robots-noindex and no-referrer meta tags as headers. It adds nosniff, frame denial and a restrictive Permissions-Policy, and caches `assets/*` for a year, since those files are content-hashed. There is no CSP on either host.
 - **Publish both hosts after every change**, so they never drift.
+- **The Cloudflare production branch is `main`** (the project was created in the dashboard). Deploy with `--branch main`. Any other branch name becomes a Preview at `<branch>.youtrip-lookalike-vote.pages.dev`, and the bare address does not change.
 - **Wrangler gotcha (4.152.0):** when wrangler detects an AI agent, `pages project create` and a first `pages deploy` to a NEW project are redirected to Cloudflare Workers. That path fails on this project (Vite 5). A person running the command in their own terminal, or any deploy to a project that already exists, goes straight to Pages.
 
 ### 1. Kelicia: deploy Code.gs (once, in the browser)
