@@ -6,6 +6,7 @@ import {
   formatCalendarDate,
   formatSgtAxis,
   formatSgtDateTime,
+  formatSgtDayMonth,
   formatSgtShort,
   formatSgtStamp,
 } from '../src/domain/time';
@@ -95,6 +96,10 @@ describe('Singapore time', () => {
 
   it('handles midnight, noon and single-digit minutes', () => {
     expect(formatSgtShort('2026-11-08T00:05:00+08:00')).toBe('8 Nov, 12:05am');
+    expect(formatSgtDayMonth('2026-11-05T23:59:00+08:00')).toBe('5 Nov');
+    expect(formatSgtDayMonth('2026-11-05T16:30:00Z')).toBe('6 Nov');
+    expect(formatSgtDayMonth(null)).toBe('');
+    expect(formatSgtDayMonth('not a date')).toBe('');
     expect(formatSgtShort('2026-11-08T12:00:00+08:00')).toBe('8 Nov, 12:00pm');
     expect(formatSgtShort('2026-11-08T09:07:00+08:00')).toBe('8 Nov, 9:07am');
   });

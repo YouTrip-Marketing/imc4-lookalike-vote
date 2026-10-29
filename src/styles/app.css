@@ -1431,7 +1431,18 @@ a.promo-banner:focus-visible {
 
 /* The status pill is alone on its row now that the brand line is gone. */
 .voter__top {
+  flex-wrap: wrap;
   justify-content: flex-start;
+}
+
+/* "voting closes 5 Nov" (29 Oct 2026): outline only, quieter than "Voting open",
+   lower case like the pill on the key visual. Wraps under it if the row is too narrow. */
+.pill--closes {
+  border-color: var(--line);
+  background: transparent;
+  color: var(--muted);
+  letter-spacing: 0.02em;
+  text-transform: none;
 }
 
 /* Green dot while voting is open; grey before; red once closed. */

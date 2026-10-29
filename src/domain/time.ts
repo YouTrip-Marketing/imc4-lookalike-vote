@@ -74,6 +74,15 @@ export function formatSgtAxis(iso: string, withDate: boolean): string {
   return withDate ? `${p.day} ${MONTHS[p.month]} ${time}` : time;
 }
 
+/** "5 Nov": the Singapore day and month an instant falls on. Returns '' for a missing or unreadable value. */
+export function formatSgtDayMonth(iso: string | null): string {
+  if (iso === null) return '';
+  const instant = new Date(iso);
+  if (Number.isNaN(instant.getTime())) return '';
+  const p = sgtParts(instant);
+  return `${p.day} ${MONTHS[p.month]}`;
+}
+
 /** The Singapore calendar day an instant falls on, as YYYY-MM-DD. */
 export function sgtDay(iso: string): string {
   const instant = new Date(iso);

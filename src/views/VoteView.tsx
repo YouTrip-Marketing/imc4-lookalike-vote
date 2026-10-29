@@ -8,7 +8,7 @@ import {
   type FormEvent,
   type ReactNode,
 } from 'react';
-import { event } from '../../event.config';
+import { event, votingWindow } from '../../event.config';
 import { useContestants } from '../contestants';
 import { DemoVoterPanel } from '../demo/lazy';
 import { checkEmail, type EmailProblem } from '../domain/email';
@@ -27,7 +27,7 @@ import {
 } from '../storage/voteMarker';
 import { hasDemoControls, type VoteStore } from '../storage';
 import { ContestantArt } from '../ui/ContestantArt';
-import { Message, Sheet, Spinner, StatusPill } from '../ui/common';
+import { ClosesPill, Message, Sheet, Spinner, StatusPill } from '../ui/common';
 import { KeyVisualBanner } from '../ui/KeyVisual';
 import { PromoBannerSlot, PromoPopup } from '../ui/PromoBanner';
 
@@ -532,6 +532,7 @@ function VoteShell({
         {status !== undefined && (
           <div className="voter__top">
             <StatusPill status={status} />
+            {status === 'open' && <ClosesPill closesAt={votingWindow.closesAt} />}
           </div>
         )}
       {offline && (

@@ -1,5 +1,6 @@
 import { useEffect, useRef, type ReactNode } from 'react';
 import { event } from '../../event.config';
+import { formatSgtDayMonth } from '../domain/time';
 import type { VotingStatus } from '../domain/types';
 
 /** A build published for testing on real phones (VITE_TEST_DEPLOY=1). */
@@ -35,6 +36,17 @@ export function StatusPill({ status }: { status: VotingStatus }): JSX.Element {
       {STATUS_LABEL[status]}
     </span>
   );
+}
+
+/**
+ * "voting closes 5 Nov": the secondary pill beside "Voting open" (29 Oct 2026),
+ * lower case to match the pill on the key visual. The date comes from the
+ * closing instant in Singapore time. Renders nothing if the date is unreadable.
+ */
+export function ClosesPill({ closesAt }: { closesAt: string | null }): JSX.Element | null {
+  const day = formatSgtDayMonth(closesAt);
+  if (day === '') return null;
+  return <span className="pill pill--closes">voting closes {day}</span>;
 }
 
 export function Brand(): JSX.Element {

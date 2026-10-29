@@ -25,7 +25,7 @@ import { basename, dirname, join, resolve } from 'node:path';
 import puppeteer, { type Browser, type BrowserContext, type Page } from 'puppeteer-core';
 import { build, preview, type Plugin, type PreviewServer } from 'vite';
 import { burstRule, contestants, demo, event, keyVisual, promoBanner, votingWindow } from '../event.config';
-import { formatLongCalendarDate, formatSgtDateTime } from '../src/domain/time';
+import { formatLongCalendarDate, formatSgtDateTime, formatSgtDayMonth } from '../src/domain/time';
 import { startLocalApiServer, type LocalApiServer } from './local-api-server';
 import { STUB_IP, dryRunContestants, startSheetStubServer, type SheetStubServer } from './sheet-stub-server';
 
@@ -878,6 +878,19 @@ async function partA(browser: Browser, site: string): Promise<void> {
     assert.equal(/jung\s*kook|lookalike contest/i.test(await text(voter)), false, 'the page text names the contest/artist');
     const dot = await voter.$eval('.pill--open .pill__dot', (node) => getComputedStyle(node).backgroundColor);
     assert.equal(dot, 'rgb(61, 220, 132)', 'the open dot is not green');
+    assert.equal(
+      await voter.$eval('.voter__top .pill--closes', (node) => node.textContent),
+      `voting closes ${formatSgtDayMonth(votingWindow.closesAt)}`,
+    );
+    assert.equal(formatSgtDayMonth(votingWindow.closesAt), '5 Nov');
+    const pills = await voter.$$eval('.voter__top .pill', (nodes) =>
+      nodes.map((node) => { const r = node.getBoundingClientRect(); return { h: r.height, bottom: r.bottom }; }),
+    );
+    const heading = await voter.$eval('.voter__intro h1', (node) => node.getBoundingClientRect().top);
+    for (const pill of pills) {
+      assert.ok(pill.h < 40, 'a status pill wrapped onto two lines');
+      assert.ok(pill.bottom <= heading, 'a status pill overlaps the heading');
+    }
     assert.equal(await voter.$eval('.voter__intro h1', (node) => node.textContent), OPEN_H1);
     assert.equal(OPEN_H1, 'Who makes the Top 10?');
     assert.equal(await voter.$eval('.voter__lede', (node) => node.textContent), OPEN_LEDE);
@@ -938,6 +951,7 @@ async function partA(browser: Browser, site: string): Promise<void> {
     await press(voter, 'Before voting opens');
     await see(voter, 'Voting opens soon');
     await see(voter, `Voting opens ${formatSgtDateTime(votingWindow.opensAt)}.`);
+    assert.equal(await voter.$('.pill--closes'), null, 'the closes pill shows before voting opens');
     assert.equal(await cardsDisabled(voter), true);
     await shot(voter, 'demo-02-vote-not-open');
     await checkPromo(voter, 'bottom');
@@ -1097,6 +1111,7 @@ async function partA(browser: Browser, site: string): Promise<void> {
   await step('after the window: closed, with the Top 10 date', async () => {
     await press(voter, 'After voting closes');
     await see(voter, 'Voting has closed');
+    assert.equal(await voter.$('.pill--closes'), null, 'the closes pill shows after voting closed');
     await see(voter, TOP10_LINE);
     assert.ok(TOP10_LINE === 'Top 10 will be announced Saturday, 7 Nov.', TOP10_LINE);
     assert.equal(await cardsDisabled(voter), true);
