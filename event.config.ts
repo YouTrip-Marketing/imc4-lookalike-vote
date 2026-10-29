@@ -85,9 +85,9 @@ export const event: EventInfo = {
  * the slot; a production build shows nothing, and `npm run check:deploy` warns.
  */
 export const keyVisual: KeyVisual = {
-  mobile: 'key-visual/imc4-lookalike-kv-1080x608.webp',
-  desktop: 'key-visual/imc4-lookalike-kv-1920x640.webp',
-  alt: 'Top 20 K-pop idol lookalikes. YouTrip. Voting closes 5 Nov. T&Cs apply.',
+  mobile: 'key-visual/imc4-lookalike-kv-r2-1080x608.webp',
+  desktop: 'key-visual/imc4-lookalike-kv-r2-1920x640.webp',
+  alt: 'Top 20 K-pop idol lookalikes. YouTrip, best rates all day. T&Cs apply.',
 };
 
 /**
