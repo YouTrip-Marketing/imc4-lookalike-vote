@@ -68,8 +68,8 @@ describe('event.config.ts', () => {
     };
 
     it('points at the supplied phone (16:9) and desktop (3:1) files, under the project naming convention', () => {
-      expect(keyVisual.mobile).toBe('key-visual/imc4-lookalike-kv-r2-1080x608.webp');
-      expect(keyVisual.desktop).toBe('key-visual/imc4-lookalike-kv-r2-1920x640.webp');
+      expect(keyVisual.mobile).toBe('key-visual/imc4-lookalike-kv-r3-1080x608.webp');
+      expect(keyVisual.desktop).toBe('key-visual/imc4-lookalike-kv-r3-1920x640.webp');
       expect(existsSync(publicFile(keyVisual.mobile))).toBe(true);
       expect(existsSync(publicFile(keyVisual.desktop))).toBe(true);
     });
@@ -85,7 +85,7 @@ describe('event.config.ts', () => {
     });
 
     it('has the agreed alt text', () => {
-      expect(keyVisual.alt).toBe('Top 20 K-pop idol lookalikes. YouTrip, best rates all day. T&Cs apply.');
+      expect(keyVisual.alt).toBe('Top 10 K-pop idol lookalikes. YouTrip, best rates all day. T&Cs apply.');
     });
 
     it('never names the artist in the alt text (naming rule, until legal clears)', () => {

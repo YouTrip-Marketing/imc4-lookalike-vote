@@ -138,14 +138,15 @@ upload feature**: drop the files in `public/key-visual/` and set `keyVisual` in
 
 ### The real key visual and its colour band (Revision 8, 2026-10-05)
 
-Kelicia's "Top 20" key visual, revision 2 (29 Oct 2026: the top-right pill now
-reads "best rates all day"), re-encoded from her PNGs to quality-90 WebP to meet
-the 250 KB spec: `public/key-visual/imc4-lookalike-kv-r2-1080x608.webp` (16:9,
-below 900px, 69 KB) and `imc4-lookalike-kv-r2-1920x640.webp` (3:1, from 900px,
-98 KB). New filenames on each revision bust caches. Her source PNGs are in
-`builds/_archive/imc4-lookalike-voting-rev9-kv-png-lookalikes/new-source-29oct/`.
+Kelicia's "Top 10" key visual, revision 3 (5 Nov 2026, for the final round),
+re-encoded from her PNGs to quality-90 WebP to meet the 250 KB spec:
+`public/key-visual/imc4-lookalike-kv-r3-1080x608.webp` (16:9, below 900px,
+66 KB) and `imc4-lookalike-kv-r3-1920x640.webp` (3:1, from 900px, 96 KB).
+New filenames on each revision bust caches. Her source PNGs and the r2
+"Top 20" WebPs are in `builds/_archive/imc4-lookalike-voting-kv-r2-top20/`.
+Background edges match r2 within 3/255, so the band stops below are unchanged.
 The close date now lives in the "voting closes 5 Nov" pill on the page. Alt text:
-"Top 20 K-pop idol lookalikes. YouTrip, best rates all day. T&Cs apply." It must
+"Top 10 K-pop idol lookalikes. YouTrip, best rates all day. T&Cs apply." It must
 never name the artist (unit-tested).
 
 The creative's background is a left-to-right gradient, dark indigo to violet,
