@@ -829,6 +829,7 @@ cd dist-prod && git add -A && git commit -m "Publish voting site" && git push ht
 5. **Headline kept, her line under it:** the H1 stays "Who makes the Top 10?" (Kelicia, 13 Oct: keep it). Under it: "Vote your favourite lookalike now! Voting closes Thu 5 Nov, 11:59pm SGT." (date from `votingWindow`).
 6. **Rule line:** "One vote per person. It cannot be changed once you confirm." It also appears in the confirm sheet.
 7. **Promo pop-up after a vote** (`PromoPopup` in `src/ui/PromoBanner.tsx`). It holds the creative and a Close button, and links to `promoBanner.href` once that is set. Before a vote the promo is not on the page. Once voted, or when voting is not open, it also sits at the bottom.
+8. **Revision 11 (5 Nov 2026): "Your vote is in" panel replaces the image-only pop-up.** Same mechanics (opens once the vote is counted, Back or backdrop closes it). It shows the heading ("Your vote for #7 Name is in"), the 100 Flights creative, four short lines, a "Join the 100 Flights promo" button to `promoBanner.href` (new tab) and Close. All wording lives in `promoDetails` in `event.config.ts`. At 360 x 640 it fits without scrolling; shorter screens scroll inside the panel.
 8. **Top 10 line:** "Top 10 will be announced Saturday, 7 Nov." (from `event.top10AnnouncedOn`).
 
 ## Test votes into a Google Sheet (2026-10-13; production since 26 Oct, see Launch)

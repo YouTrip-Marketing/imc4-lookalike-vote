@@ -5,7 +5,7 @@ import { resolve } from 'node:path';
  * that must stay true however the file is edited.
  */
 import { describe, expect, it } from 'vitest';
-import { burstRule, contestants, demo, event, keyVisual, promoBanner, sharedAddressRule, votingRules, votingWindow } from '../event.config';
+import { burstRule, contestants, demo, event, keyVisual, promoBanner, promoDetails, sharedAddressRule, votingRules, votingWindow } from '../event.config';
 import { buildSeedSql } from '../scripts/generate-seed-sql';
 import { effectiveStatus } from '../src/domain/voting';
 
@@ -96,6 +96,22 @@ describe('event.config.ts', () => {
 
   it('has a shared-address flag threshold that can flag something', () => {
     expect(sharedAddressRule.votes).toBeGreaterThanOrEqual(2);
+  });
+
+  it('words the post-vote "Your vote is in" panel with the CS promo brief facts only (Revision 11)', () => {
+    expect(promoDetails).toEqual({
+      heading: 'Your vote is in',
+      headingWithName: 'Your vote for {name} is in',
+      lines: [
+        '100 Flights to Korea: 28 Oct to 31 Dec 2026.',
+        'New to YouTrip? Sign up with promo code FLY100KR.',
+        'Already on YouTrip? Tap "Join now" on the 100 Flights banner in the app, then spend S$500 within the campaign period.',
+        'Winners drawn 31 Jan 2027. T&Cs apply.',
+      ],
+      cta: 'Join the 100 Flights promo',
+    });
+    // Public page: never the artist's name.
+    expect(JSON.stringify(promoDetails)).not.toMatch(/jung ?kook|jkook/i);
   });
 
   it('points the promo banner at the supplied creatives (3:1 and 16:9 phone), with the agreed alt text and the YouTrip OneLink', () => {

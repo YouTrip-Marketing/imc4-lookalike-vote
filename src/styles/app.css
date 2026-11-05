@@ -1479,9 +1479,30 @@ a.promo-banner:focus-visible {
   outline: none;
 }
 
-/* The post-vote promo pop-up: the creative as large as the screen allows, then Close. */
+/* The post-vote "Your vote is in" panel: heading, the creative, the promo's lines, then the buttons. */
 .sheet--promo {
   width: min(100% - 32px, 720px);
+}
+
+.sheet--promo h2 {
+  margin-bottom: 14px;
+}
+
+.promo-details {
+  display: grid;
+  gap: 6px;
+  margin: 14px 0 0;
+  padding: 0 0 0 18px;
+  list-style: disc;
+  color: var(--muted);
+  font-size: 0.9375rem;
+  line-height: 1.4;
+  text-align: left;
+  text-wrap: pretty;
+}
+
+.promo-details li::marker {
+  color: var(--lilac);
 }
 
 .sheet--promo .sheet__body {

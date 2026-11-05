@@ -1,5 +1,5 @@
-import { useEffect } from 'react';
-import { promoBanner } from '../../event.config';
+import { useEffect, useId } from 'react';
+import { promoBanner, promoDetails } from '../../event.config';
 import { Sheet } from './common';
 
 /** Below this width the optional phone image is used. */
@@ -70,15 +70,33 @@ export function PromoBannerSlot({ placement, eager = false }: Props): JSX.Elemen
   );
 }
 
+/** The panel heading, with the contestant's name when it is known. */
+export function voteIsInHeading(name: string | undefined): string {
+  return name === undefined || name.trim() === ''
+    ? promoDetails.heading
+    : promoDetails.headingWithName.replace('{name}', name);
+}
+
 /**
- * Revision 10: the promo as a pop-up straight after a vote is counted. An image
- * (a link once promoBanner.href is set) and a Close button. Nothing else.
+ * Revision 11: the "Your vote is in" panel, straight after a vote is counted.
+ * Heading, the promo image, the promo's short lines, a button to the promo
+ * link (when one is set) and Close. Replaces Revision 10's image-only pop-up.
  *
  * Opening it adds a browser history entry, so the phone's Back gesture closes
- * the pop-up and leaves the visitor on the voting page with every contestant,
+ * the panel and leaves the visitor on the voting page with every contestant,
  * instead of taking them out of the site.
  */
-export function PromoPopup({ open, onClose }: { open: boolean; onClose: () => void }): JSX.Element | null {
+export function PromoPopup({
+  open,
+  onClose,
+  votedForName,
+}: {
+  open: boolean;
+  onClose: () => void;
+  /** e.g. "#7 Jun Hao". Omitted: the heading has no name. */
+  votedForName?: string;
+}): JSX.Element | null {
+  const headingId = useId();
   useEffect(() => {
     if (!open) return undefined;
     window.history.pushState({ imc4PromoPopup: true }, '');
@@ -98,11 +116,23 @@ export function PromoPopup({ open, onClose }: { open: boolean; onClose: () => vo
       onClose();
     }
   };
+  const link = safeHref(promoBanner.href);
 
   return (
-    <Sheet open onClose={close} label={promoBanner.alt} className="sheet--promo">
+    <Sheet open onClose={close} labelledBy={headingId} className="sheet--promo">
+      <h2 id={headingId}>{voteIsInHeading(votedForName)}</h2>
       <PromoBannerSlot placement="pop-up" eager />
+      <ul className="promo-details">
+        {promoDetails.lines.map((line) => (
+          <li key={line}>{line}</li>
+        ))}
+      </ul>
       <div className="sheet__actions">
+        {link !== null && (
+          <a className="button button--wide" href={link} target="_blank" rel="noopener noreferrer">
+            {promoDetails.cta}
+          </a>
+        )}
         <button type="button" className="button button--ghost button--wide" onClick={close}>
           Close
         </button>

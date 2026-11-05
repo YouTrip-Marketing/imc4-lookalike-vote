@@ -24,7 +24,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync
 import { basename, dirname, join, resolve } from 'node:path';
 import puppeteer, { type Browser, type BrowserContext, type Page } from 'puppeteer-core';
 import { build, preview, type Plugin, type PreviewServer } from 'vite';
-import { burstRule, contestants, demo, event, keyVisual, promoBanner, votingWindow } from '../event.config';
+import { burstRule, contestants, demo, event, keyVisual, promoBanner, promoDetails, votingWindow } from '../event.config';
 import { formatLongCalendarDate, formatSgtDateTime, formatSgtDayMonth } from '../src/domain/time';
 import { startLocalApiServer, type LocalApiServer } from './local-api-server';
 import { STUB_IP, dryRunContestants, startSheetStubServer, type SheetStubServer } from './sheet-stub-server';
@@ -832,6 +832,7 @@ async function partD(
     await press(voter, 'Confirm vote', 'dialog.sheet');
     await see(voter, 'Done. Your vote is counted.');
     await checkPromo(voter, 'pop-up');
+    await checkVoteIsInPanel(voter, '#7 Dry Run 07');
     const href = await voter.$eval('dialog.sheet--promo .promo-banner', (node) => node.getAttribute('href'));
     assert.equal(href, 'https://youtrip.onelink.me/P5AL/voting-site');
     await shot(voter, 'prod-sheet-390-2-popup');
@@ -1029,6 +1030,7 @@ async function partA(browser: Browser, site: string): Promise<void> {
     await see(voter, 'Done. Your vote is counted.');
     assert.equal(await cardsDisabled(voter), true, 'a voted browser shows its vote, not a fresh ballot');
     await checkPromo(voter, 'pop-up');
+    await checkVoteIsInPanel(voter, '#7 Contestant 7');
     await shot(voter, 'demo-04a-promo-popup');
   });
 
@@ -1400,7 +1402,7 @@ async function checkPromo(
   assert.equal(promo.inConfirmSheet, false, 'the promo banner is inside the confirm sheet');
   assert.equal(promo.placement, expected);
   if (expected === 'bottom') assert.ok(promo.afterGrid, 'the promo banner should come after the contestants');
-  else assert.deepEqual(promo.closeButton, ['Close'], 'the pop-up should hold the creative and one Close button');
+  else assert.deepEqual(promo.closeButton, ['Close'], 'the panel should hold one button, Close (the promo button is a link)');
   assert.ok(promo.widthMatchesColumn, 'the promo banner is not the width of its column');
   // The real config has a 16:9 phone image, used below 640px: so does the stand-in build.
   const phone = options.phone ?? (await page.evaluate(() => window.innerWidth < 640));
@@ -1428,6 +1430,40 @@ async function checkPromo(
     assert.equal(promo.rel, 'noopener noreferrer');
   }
   if (expected === 'bottom') await page.evaluate(() => window.scrollTo(0, 0));
+}
+
+/**
+ * Revision 11: the post-vote "Your vote is in" panel. Heading (with the name),
+ * the promo image (checked by checkPromo), the configured lines in order, a
+ * safe new-tab link to the promo, then Close; and the panel never runs off
+ * the screen (it fits, or scrolls inside itself).
+ */
+async function checkVoteIsInPanel(page: Page, votedForName: string, link = promoBanner.href ?? ''): Promise<void> {
+  const panel = await page.$eval('dialog.sheet--promo[open]', (dialog) => {
+    const heading = dialog.querySelector('h2');
+    const cta = dialog.querySelector<HTMLAnchorElement>('.sheet__actions a');
+    const box = dialog.getBoundingClientRect();
+    return {
+      heading: (heading?.textContent ?? '').trim(),
+      labelledByHeading: heading !== null && dialog.getAttribute('aria-labelledby') === heading.id,
+      order: [...dialog.querySelectorAll('h2, .promo-banner, .promo-details, .sheet__actions')].map((n) => n.className || n.tagName),
+      lines: [...dialog.querySelectorAll('.promo-details li')].map((li) => (li.textContent ?? '').trim()),
+      cta: cta === null ? null : { text: (cta.textContent ?? '').trim(), href: cta.getAttribute('href'), target: cta.target, rel: cta.rel },
+      actions: [...dialog.querySelectorAll('.sheet__actions > *')].map((n) => (n.textContent ?? '').trim()),
+      top: box.top,
+      bottom: box.bottom,
+      fitsOrScrolls: box.bottom <= window.innerHeight + 1 || dialog.scrollHeight > dialog.clientHeight,
+      withinScreen: box.top >= -1 && box.bottom <= window.innerHeight + 1,
+    };
+  });
+  assert.equal(panel.heading, promoDetails.headingWithName.replace('{name}', votedForName));
+  assert.ok(panel.labelledByHeading, 'the panel is not named by its heading');
+  assert.deepEqual(panel.order, ['H2', 'promo-banner promo-banner--has-phone', 'promo-details', 'sheet__actions']);
+  assert.deepEqual(panel.lines, [...promoDetails.lines]);
+  assert.deepEqual(panel.cta, { text: promoDetails.cta, href: link, target: '_blank', rel: 'noopener noreferrer' });
+  assert.deepEqual(panel.actions, [promoDetails.cta, 'Close']);
+  assert.ok(panel.withinScreen, `the panel runs off the screen (top ${panel.top}, bottom ${panel.bottom})`);
+  assert.ok(panel.fitsOrScrolls, 'the panel neither fits nor scrolls');
 }
 
 type BannerVariant = 'placeholder' | 'real' | 'kv';

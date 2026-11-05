@@ -84,7 +84,7 @@ export function VoteView({ store }: { store: VoteStore }): JSX.Element {
   const [emailError, setEmailError] = useState<string | null>(null);
   const announcer = useRef<HTMLParagraphElement>(null);
   const grid = useRef<HTMLUListElement>(null);
-  // Revision 10: the promo pops up once, straight after a vote is counted.
+  // Revision 11: the "Your vote is in" panel opens once, straight after a vote is counted.
   const [promoOpen, setPromoOpen] = useState(false);
   const closePromo = useCallback(() => setPromoOpen(false), []);
 
@@ -476,7 +476,11 @@ export function VoteView({ store }: { store: VoteStore }): JSX.Element {
         )}
       </Sheet>
 
-      <PromoPopup open={promoOpen && cast.phase === 'counted'} onClose={closePromo} />
+      <PromoPopup
+        open={promoOpen && cast.phase === 'counted'}
+        onClose={closePromo}
+        votedForName={votedFor === undefined ? undefined : nameOf(votedFor)}
+      />
     </VoteShell>
   );
 }

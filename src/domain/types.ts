@@ -41,6 +41,18 @@ export interface PromoBanner {
   href?: string;
 }
 
+/** The "Your vote is in" panel that opens straight after a vote (Revision 11). */
+export interface PromoDetails {
+  /** Heading when the contestant is not known. */
+  heading: string;
+  /** Heading when the contestant is known. `{name}` becomes e.g. "#7 Jun Hao". */
+  headingWithName: string;
+  /** Short lines under the promo image, in order. Plain text. */
+  lines: readonly string[];
+  /** Label of the button that opens promoBanner.href. */
+  cta: string;
+}
+
 export interface KeyVisual {
   /** 16:9 image used on phones, and at every width when `desktop` is not set. null = no key visual yet. */
   mobile: string | null;

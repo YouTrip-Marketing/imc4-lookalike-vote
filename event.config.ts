@@ -3,8 +3,9 @@
  *
  *   event         - title and the copy that frames the vote
  *   keyVisual     - the banner image at the top of the voting page
- *   promoBanner   - the campaign promo banner (Revision 10: pops up straight
- *                   after a vote; also at the bottom once voted or not open)
+ *   promoBanner   - the campaign promo banner (in the post-vote panel; also at
+ *                   the bottom once voted or not open)
+ *   promoDetails  - the words in the post-vote "Your vote is in" panel
  *   contestants   - the 20 in the vote
  *   votingWindow  - when voting opens and closes (Singapore time)
  *   votingRules   - whether a vote can be changed, public counts
@@ -28,6 +29,7 @@ import type {
   EventInfo,
   KeyVisual,
   PromoBanner,
+  PromoDetails,
   SharedAddressRule,
   VotingRules,
   VotingWindow,
@@ -112,6 +114,23 @@ export const promoBanner: PromoBanner = {
   // AppsFlyer OneLink that opens the YouTrip app (Kelicia, 26 Oct 2026). Was the
   // campaign blog post. Desktop and no-app fallback is set on the AppsFlyer side.
   href: 'https://youtrip.onelink.me/P5AL/voting-site',
+};
+
+/**
+ * Revision 11 (Kelicia, 5 Nov 2026): the post-vote panel. Heading, the promo
+ * image above, these lines, then a button to promoBanner.href and Close.
+ * Facts from the CS promo brief only. Edit the wording here, not in components.
+ */
+export const promoDetails: PromoDetails = {
+  heading: 'Your vote is in',
+  headingWithName: 'Your vote for {name} is in',
+  lines: [
+    '100 Flights to Korea: 28 Oct to 31 Dec 2026.',
+    'New to YouTrip? Sign up with promo code FLY100KR.',
+    'Already on YouTrip? Tap "Join now" on the 100 Flights banner in the app, then spend S$500 within the campaign period.',
+    'Winners drawn 31 Jan 2027. T&Cs apply.',
+  ],
+  cta: 'Join the 100 Flights promo',
 };
 
 /**
