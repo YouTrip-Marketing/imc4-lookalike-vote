@@ -1,0 +1,54 @@
+# Deploys the page to Cloudflare Pages (youtrip-lookalike-vote.pages.dev) on every
+# push to main, the same way the main session deploys by hand:
+#   npm run build:prod:cf  ->  wrangler pages deploy dist-prod-cf --project-name youtrip-lookalike-vote --branch main
+#
+# The Pages project was created by direct upload, and Cloudflare cannot convert a
+# direct-upload project to a Git-connected one without recreating it (and its
+# address). This workflow gives the same "merge to main, it ships" result while
+# keeping the live address.
+#
+# Repository secrets (Settings > Secrets and variables > Actions):
+#   CLOUDFLARE_API_TOKEN   API token with "Cloudflare Pages: Edit" on this account
+#   CLOUDFLARE_ACCOUNT_ID  the account id
+#   VITE_SHEET_ENDPOINT    the Apps Script web app address (.../exec), as in .env.production
+name: Deploy to Cloudflare Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: cloudflare-pages-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Production build (sheet adapter)
+        env:
+          VITE_STORAGE_ADAPTER: sheet
+          VITE_SHEET_ENDPOINT: ${{ secrets.VITE_SHEET_ENDPOINT }}
+        run: npm run build:prod:cf
+
+      - name: Deploy
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy dist-prod-cf --project-name youtrip-lookalike-vote --branch main
