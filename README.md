@@ -69,13 +69,19 @@ Everything is in **`event.config.ts`**. Nothing about the event is hardcoded els
 | Promo banner | `promoBanner`: `image`, optional `phoneImage`, `alt`, optional `href` (https:// only). Files in `public/promo/`. See "Promo banner" |
 | Key visual banner | `keyVisual`: `mobile`, optional `desktop`, `alt`. Files in `public/key-visual/`. Spec: `developer/outbox/imc4-voting-site-key-visual-spec.md`. Set since Revision 8 (Kelicia's "Top 20" creative). A new creative also needs the band colours re-sampled (see "Key visual banner") |
 | Voting window | `votingWindow.opensAt` / `closesAt`. Always write `+08:00` |
-| Top 10 announcement date | `event.top10AnnouncedOn` (`YYYY-MM-DD`) |
+| Winner announcement date | `event.winnerAnnouncedOn` (`YYYY-MM-DD`), shown after a vote as "The winner will be announced on Thu 12 Nov 2026." (Revision 12). `top10AnnouncedOn` stays in config but is no longer shown |
 | Votes per email | Fixed at one. Not a setting |
 | Let voters change their vote | `votingRules.allowVoteChange` (default `false`. Leave it off while emails are unverified: with it on, anyone who knows a voter's address could move that vote) |
 | Show live counts to the public | `votingRules.publicCounts` (default `false`) |
 | Burst flag threshold | `burstRule` |
 | "Many votes from one network" flag threshold | `sharedAddressRule` (default 10 votes from one IP address). Flag only |
 | Legal-review switch | `event.legalReviewPending` (blocks `npm run deploy` while `true`; not shown on the page) |
+
+**Revision 12 (Kelicia, 5 Nov 2026): voting now closes Thu 12 Nov 2026 23:59 SGT**
+(`votingWindow.closesAt` and Code.gs `CLOSES_AT`, unit-tested to match; she said
+"12 Nov", the 23:59 follows the file's convention). The winner is announced
+Thu 12 Nov 2026 (`winnerAnnouncedOn`). The page has been open since 26 Oct 00:00.
+The "voting closes" pill and the lede follow from config. History below.
 
 **Voting window confirmed by Kelicia (2026-10-13):** opens Mon 2 Nov 2026 12:00
 SGT (Top 20 reveal), closes Thu 5 Nov 2026 23:59 SGT (matches the key visual's
@@ -145,7 +151,7 @@ re-encoded from her PNGs to quality-90 WebP to meet the 250 KB spec:
 New filenames on each revision bust caches. Her source PNGs and the r2
 "Top 20" WebPs are in `builds/_archive/imc4-lookalike-voting-kv-r2-top20/`.
 Background edges match r2 within 3/255, so the band stops below are unchanged.
-The close date now lives in the "voting closes 5 Nov" pill on the page. Alt text:
+The close date now lives in the "voting closes 12 Nov" pill on the page. Alt text:
 "Top 10 K-pop idol lookalikes. YouTrip, best rates all day. T&Cs apply." It must
 never name the artist (unit-tested).
 
@@ -771,7 +777,7 @@ either removed paragraph comes back.
 
 **Vote store:** Kelicia's private Google Sheet **"Voting site"** ([`1ir3Umrw3Xq_ImhOA08Qcdj4aXD06LRuJSoDvCFLMqKI`](https://docs.google.com/spreadsheets/d/1ir3Umrw3Xq_ImhOA08Qcdj4aXD06LRuJSoDvCFLMqKI)) through `apps-script/Code.gs`, which refuses to write to any other spreadsheet. (The 13 Oct sheet `1nq_hyB…` is the test target only.)
 
-**Tally tab** (live, formula-only, nothing for Code.gs to maintain): **Total votes** headline (B1), Refused repeats (B2), Last vote at (B3, the latest counted vote's SGT timestamp), a note that it updates live, then Rank / No. / Contestant name / Votes for 1 to 20. Votes per contestant are `COUNTIFS(Votes!E:E, no., Votes!I:I, FALSE)`: they depend on Votes column E (Contestant no.) and I (Duplicate?), so re-check them after any change to Code.gs's column order. Replace the "Contestant N" names when the real Top 20 are known. Code.gs enforces the voting window (open from 26 Oct 2026 00:00 to 5 Nov 23:59 SGT per Kelicia, 26 Oct: "live anytime"; same as `event.config.ts`, unit-tested), one vote per email, and the admin passcode for the tally. The page shows no banner and follows the same window. Admin Open/Close is disabled: the window opens and closes by itself.
+**Tally tab** (live, formula-only, nothing for Code.gs to maintain): **Total votes** headline (B1), Refused repeats (B2), Last vote at (B3, the latest counted vote's SGT timestamp), a note that it updates live, then Rank / No. / Contestant name / Votes for 1 to 20. Votes per contestant are `COUNTIFS(Votes!E:E, no., Votes!I:I, FALSE)`: they depend on Votes column E (Contestant no.) and I (Duplicate?), so re-check them after any change to Code.gs's column order. Replace the "Contestant N" names when the real Top 20 are known. Code.gs enforces the voting window (open from 26 Oct 2026 00:00 to 12 Nov 23:59 SGT per Kelicia (close moved from 5 Nov in Revision 12), 26 Oct: "live anytime"; same as `event.config.ts`, unit-tested), one vote per email, and the admin passcode for the tally. The page shows no banner and follows the same window. Admin Open/Close is disabled: the window opens and closes by itself.
 
 **Admin passcode:** only its SHA-256 is in Code.gs (`ADMIN_KEY_SHA256`); the passcode itself is in `developer/outbox/imc4-voting-site-ADMIN-PASSCODE.txt` (gitignored) and never in the page. `#/admin` sends it to Code.gs, which answers the tally only to the right passcode.
 
@@ -827,11 +833,12 @@ cd dist-prod && git add -A && git commit -m "Publish voting site" && git push ht
 2. **Key visual edge to edge.** It sits outside the padded column, with no side or top gap and no rounded corners, up to 1920px wide. On desktop this makes it much taller than before (427px at 1280). Option B, a re-cut with a bigger title lockup, needs design.
 3. **Brand line removed** from the voting page. The key visual carries the title. The admin view keeps it.
 4. **Green dot** on "Voting open". Grey before voting opens, red once closed.
-5. **Headline kept, her line under it:** the H1 stays "Who makes the Top 10?" (Kelicia, 13 Oct: keep it). Under it: "Vote your favourite lookalike now! Voting closes Thu 5 Nov, 11:59pm SGT." (date from `votingWindow`).
+5. **Headline kept, her line under it:** the H1 stays "Who makes the Top 10?" (Kelicia, 13 Oct: keep it). Under it: "Vote your favourite lookalike now! Voting closes Thu 12 Nov, 11:59pm SGT." (date from `votingWindow`).
 6. **Rule line:** "One vote per person. It cannot be changed once you confirm." It also appears in the confirm sheet.
 7. **Promo pop-up after a vote** (`PromoPopup` in `src/ui/PromoBanner.tsx`). It holds the creative and a Close button, and links to `promoBanner.href` once that is set. Before a vote the promo is not on the page. Once voted, or when voting is not open, it also sits at the bottom.
 8. **Revision 11 (5 Nov 2026): "Your vote is in" panel replaces the image-only pop-up.** Same mechanics (opens once the vote is counted, Back or backdrop closes it). It shows the heading ("Your vote for #7 Name is in"), the 100 Flights creative, four short lines, a "Join the 100 Flights promo" button to `promoBanner.href` (new tab) and Close. All wording lives in `promoDetails` in `event.config.ts`. At 360 x 640 it fits without scrolling; shorter screens scroll inside the panel.
-8. **Top 10 line:** "Top 10 will be announced Saturday, 7 Nov." (from `event.top10AnnouncedOn`).
+9. **Announcement line (Revision 12):** "The winner will be announced on Thu 12 Nov 2026." (from `event.winnerAnnouncedOn`). Replaces "Top 10 will be announced Saturday, 7 Nov."
+10. **Revision 12: promo under the lede.** Once this browser has voted (voting open or closed), the 100 Flights banner sits straight under the "You voted for" line, before See all contestants (`placement="lede"`, eager). The bottom copy stays.
 
 ## Test votes into a Google Sheet (2026-10-13; production since 26 Oct, see Launch)
 

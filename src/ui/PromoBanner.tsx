@@ -18,9 +18,12 @@ function safeHref(href: string | undefined): string | null {
 }
 
 interface Props {
-  /** Where it sits, for layout and tests: at the bottom of the page, or in the post-vote pop-up. */
-  placement: 'bottom' | 'pop-up';
-  /** Lazy below the fold; eager in the pop-up, which is on screen the moment it opens. */
+  /**
+   * Where it sits, for layout and tests: at the bottom of the page, in the
+   * post-vote panel, or under the "You voted for" line (Revision 12).
+   */
+  placement: 'bottom' | 'pop-up' | 'lede';
+  /** Lazy below the fold; eager in the panel and under the lede, which are on screen at once. */
   eager?: boolean;
 }
 

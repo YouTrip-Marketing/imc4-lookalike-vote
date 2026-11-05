@@ -55,11 +55,12 @@ describe('the sheet store (test site)', () => {
   it('production: no banner, and the configured window decides whether voting is open', async () => {
     const at = (iso: string) => store({ fetch: vi.fn(), now: () => new Date(iso) });
     expect(at('2026-10-26T10:00:00+08:00').isDemo).toBe(false);
-    // Open from 26 Oct 2026 00:00 SGT (Kelicia: live anytime), closes 5 Nov 23:59 SGT.
+    // Open from 26 Oct 2026 00:00 SGT (Kelicia: live anytime), closes 12 Nov 23:59 SGT (Revision 12, was 5 Nov).
     expect((await at('2026-10-25T23:59:59+08:00').getSession()).state.status).toBe('not_open');
     expect((await at('2026-10-26T00:00:00+08:00').getSession()).state.status).toBe('open');
-    expect((await at('2026-11-05T23:58:59+08:00').getSession()).state.status).toBe('open');
-    expect((await at('2026-11-05T23:59:00+08:00').getSession()).state.status).toBe('closed');
+    expect((await at('2026-11-05T23:59:00+08:00').getSession()).state.status).toBe('open');
+    expect((await at('2026-11-12T23:58:59+08:00').getSession()).state.status).toBe('open');
+    expect((await at('2026-11-12T23:59:00+08:00').getSession()).state.status).toBe('closed');
   });
 
   it('test mode: always open, shows the TEST SITE banner and never lets a vote change', async () => {

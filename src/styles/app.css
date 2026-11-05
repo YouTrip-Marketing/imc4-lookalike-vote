@@ -538,6 +538,11 @@ body:has(.kv-band) {
   margin: 0;
 }
 
+/* Revision 12: under the "You voted for" line, above See all contestants. */
+.promo-banner[data-placement='lede'] {
+  margin: 16px 0 0;
+}
+
 .promo-banner picture,
 .promo-banner__img {
   display: block;

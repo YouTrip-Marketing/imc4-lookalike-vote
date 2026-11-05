@@ -50,6 +50,10 @@ export const event: EventInfo = {
   // voting window (was 5 Nov, the PR brief's date, which is now close day).
   top10AnnouncedOn: '2026-11-07',
 
+  // Revision 12 (Kelicia, 5 Nov 2026): the line shown after a vote is now the
+  // winner announcement, "The winner will be announced on Thu 12 Nov 2026."
+  winnerAnnouncedOn: '2026-11-12',
+
   // PAGE COPY RULE (Kelicia, 2026-09-29): the page does not explain or justify
   // why it asks for things. No purpose lines, privacy explanations or
   // reassurance copy. If legal needs a purpose statement for the email, it goes
@@ -165,7 +169,7 @@ export const contestants: readonly Contestant[] = Array.from({ length: 20 }, (_,
  */
 export const votingWindow: VotingWindow = {
   opensAt: '2026-10-26T00:00:00+08:00',
-  closesAt: '2026-11-05T23:59:00+08:00',
+  closesAt: '2026-11-12T23:59:00+08:00',
   autoOpen: true,
 };
 

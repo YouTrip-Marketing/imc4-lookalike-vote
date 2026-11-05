@@ -110,6 +110,12 @@ export function formatCalendarDate(date: string): string {
   return `${DAYS[value.getUTCDay()]} ${value.getUTCDate()} ${MONTHS[value.getUTCMonth()]}`;
 }
 
+/** "Thu 12 Nov 2026" for 2026-11-12 (Revision 12 winner line). The input is a calendar date, not an instant. */
+export function formatCalendarDateWithYear(date: string): string {
+  const short = formatCalendarDate(date);
+  return short === date ? date : `${short} ${date.slice(0, 4)}`;
+}
+
 const LONG_DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
 /** "Saturday, 7 Nov" for 2026-11-07 (Revision 10 wording). The input is a calendar date, not an instant. */

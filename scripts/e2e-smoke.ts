@@ -25,7 +25,7 @@ import { basename, dirname, join, resolve } from 'node:path';
 import puppeteer, { type Browser, type BrowserContext, type Page } from 'puppeteer-core';
 import { build, preview, type Plugin, type PreviewServer } from 'vite';
 import { burstRule, contestants, demo, event, keyVisual, promoBanner, promoDetails, votingWindow } from '../event.config';
-import { formatLongCalendarDate, formatSgtDateTime, formatSgtDayMonth } from '../src/domain/time';
+import { formatCalendarDateWithYear, formatSgtDateTime, formatSgtDayMonth } from '../src/domain/time';
 import { startLocalApiServer, type LocalApiServer } from './local-api-server';
 import { STUB_IP, dryRunContestants, startSheetStubServer, type SheetStubServer } from './sheet-stub-server';
 
@@ -110,9 +110,10 @@ const CHROME_CANDIDATES = [
 const DUPLICATE = 'A vote has already been counted for this email.';
 // Revision 10: Kelicia's wording, verbatim.
 const OPEN_H1 = `Who makes the Top ${event.advancing}?`;
-const OPEN_LEDE = 'Vote your favourite lookalike now! Voting closes Thu 5 Nov, 11:59pm SGT.';
+const OPEN_LEDE = 'Vote your favourite lookalike now! Voting closes Thu 12 Nov, 11:59pm SGT.';
 const RULE_LINE = 'One vote per person. It cannot be changed once you confirm.';
-const TOP10_LINE = `Top ${event.advancing} will be announced ${formatLongCalendarDate(event.top10AnnouncedOn)}.`;
+// Revision 12: the winner line replaces "Top 10 will be announced ...".
+const WINNER_LINE = `The winner will be announced on ${formatCalendarDateWithYear(event.winnerAnnouncedOn)}.`;
 const ANOTHER_PERSON = 'Someone else voting on this phone? Vote with their email';
 
 let passed = 0;
@@ -591,7 +592,7 @@ async function measureVotedScreen(page: Page, hideDemoBanner: boolean): Promise<
     if (hide) document.head.append(style);
     const height = window.innerHeight;
     const message = document.querySelector('.voter__save:not(:empty)')?.getBoundingClientRect();
-    const promo = document.querySelector('.promo-banner')?.getBoundingClientRect();
+    const promo = document.querySelector('.promo-banner[data-placement="bottom"]')?.getBoundingClientRect();
     const grid = document.querySelector('.grid')?.getBoundingClientRect();
     const result = {
       messageBottomPx: Math.round(message?.bottom ?? -1),
@@ -883,7 +884,7 @@ async function partA(browser: Browser, site: string): Promise<void> {
       await voter.$eval('.voter__top .pill--closes', (node) => node.textContent),
       `voting closes ${formatSgtDayMonth(votingWindow.closesAt)}`,
     );
-    assert.equal(formatSgtDayMonth(votingWindow.closesAt), '5 Nov');
+    assert.equal(formatSgtDayMonth(votingWindow.closesAt), '12 Nov');
     const pills = await voter.$$eval('.voter__top .pill', (nodes) =>
       nodes.map((node) => { const r = node.getBoundingClientRect(); return { h: r.height, bottom: r.bottom }; }),
     );
@@ -1026,7 +1027,7 @@ async function partA(browser: Browser, site: string): Promise<void> {
     await typeEmail(voter, EMAIL.alice);
     await press(voter, 'Confirm vote', 'dialog.sheet');
     await see(voter, 'Vote in!');
-    await see(voter, `You voted for #7 Contestant 7. ${TOP10_LINE}`);
+    await see(voter, `You voted for #7 Contestant 7. ${WINNER_LINE}`);
     await see(voter, 'Done. Your vote is counted.');
     assert.equal(await cardsDisabled(voter), true, 'a voted browser shows its vote, not a fresh ballot');
     await checkPromo(voter, 'pop-up');
@@ -1041,6 +1042,7 @@ async function partA(browser: Browser, site: string): Promise<void> {
     assert.equal(voter.url(), before, 'Back left the voting page');
     const top = await voter.$eval('.voter__intro h1', (node) => node.getBoundingClientRect().top);
     assert.ok(top >= 0 && top < 300, `the "Vote in!" message is not on screen after the vote (top ${top})`);
+    await checkLedePromo(voter);
     await shot(voter, 'demo-04-vote-counted');
     await checkPromo(voter, 'bottom');
   });
@@ -1110,12 +1112,15 @@ async function partA(browser: Browser, site: string): Promise<void> {
     await press(voter, 'New visitor, same email');
   });
 
-  await step('after the window: closed, with the Top 10 date', async () => {
+  await step('after the window: closed, with the winner date', async () => {
     await press(voter, 'After voting closes');
     await see(voter, 'Voting has closed');
     assert.equal(await voter.$('.pill--closes'), null, 'the closes pill shows after voting closed');
-    await see(voter, TOP10_LINE);
-    assert.ok(TOP10_LINE === 'Top 10 will be announced Saturday, 7 Nov.', TOP10_LINE);
+    await see(voter, WINNER_LINE);
+    assert.ok(WINNER_LINE === 'The winner will be announced on Thu 12 Nov 2026.', WINNER_LINE);
+    assert.equal((await text(voter)).includes('Top 10 will be announced'), false, 'the old Top 10 line is still on the page');
+    // This browser's vote was just forgotten ("New visitor, same email"): no promo under the lede.
+    assert.equal(await voter.$('.promo-banner[data-placement="lede"]'), null, 'promo under the lede without a vote');
     assert.equal(await cardsDisabled(voter), true);
     await shot(voter, 'demo-07-vote-closed');
     await checkPromo(voter, 'bottom');
@@ -1362,7 +1367,8 @@ async function checkPromo(
   expected: 'bottom' | 'pop-up',
   options: { link?: string; phone?: boolean } = {},
 ): Promise<void> {
-  const selector = expected === 'pop-up' ? 'dialog.sheet--promo[open] .promo-banner' : 'main .promo-banner';
+  const selector =
+    expected === 'pop-up' ? 'dialog.sheet--promo[open] .promo-banner' : 'main .promo-banner[data-placement="bottom"]';
   await page.waitForSelector(selector, { timeout: 10_000 });
   if (expected === 'bottom') {
     await page.evaluate((sel: string) => document.querySelector(sel)?.scrollIntoView({ block: 'center' }), selector);
@@ -1430,6 +1436,45 @@ async function checkPromo(
     assert.equal(promo.rel, 'noopener noreferrer');
   }
   if (expected === 'bottom') await page.evaluate(() => window.scrollTo(0, 0));
+}
+
+/**
+ * Revision 12: once voted, the promo also sits straight under the "You voted
+ * for" line, before See all contestants: one copy there, eager, full column
+ * width, the right shape, and the bottom copy still in place.
+ */
+async function checkLedePromo(page: Page): Promise<void> {
+  const selector = '.voter__intro .promo-banner[data-placement="lede"]';
+  await page.waitForSelector(selector, { timeout: 10_000 });
+  await page.waitForFunction((sel: string) => {
+    const image = document.querySelector<HTMLImageElement>(`${sel} img`);
+    return image !== null && image.complete && image.naturalWidth > 0;
+  }, {}, selector);
+  const lede = await page.evaluate((sel: string) => {
+    const node = document.querySelector<HTMLElement>(sel);
+    const box = node?.getBoundingClientRect();
+    const intro = document.querySelector('.voter__intro')?.getBoundingClientRect();
+    const seeAll = document.querySelector('.voter__see-all');
+    return {
+      count: document.querySelectorAll(sel).length,
+      afterLede: node?.previousElementSibling?.classList.contains('voter__lede') ?? false,
+      beforeSeeAll: seeAll === null || (node !== null && node !== undefined && (node.compareDocumentPosition(seeAll) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0),
+      loading: node?.querySelector('img')?.loading ?? '',
+      href: node?.getAttribute('href'),
+      ratio: box ? box.width / box.height : 0,
+      fullWidth: box && intro ? Math.abs(box.width - intro.width) <= 1 : false,
+      bottomCopies: document.querySelectorAll('main .promo-banner[data-placement="bottom"]').length,
+    };
+  }, selector);
+  assert.equal(lede.count, 1, 'expected one promo under the lede');
+  assert.ok(lede.afterLede, 'the promo is not straight under the "You voted for" line');
+  assert.ok(lede.beforeSeeAll, 'the promo is not above See all contestants');
+  assert.equal(lede.loading, 'eager');
+  assert.equal(lede.href, promoBanner.href);
+  assert.ok(lede.fullWidth, 'the promo under the lede is not the width of the column');
+  const phone = await page.evaluate(() => window.innerWidth < 640);
+  assert.ok(Math.abs(lede.ratio - (phone ? 16 / 9 : 3)) < 0.02, `promo under the lede ratio ${lede.ratio}`);
+  assert.equal(lede.bottomCopies, 1, 'the bottom promo is gone');
 }
 
 /**
@@ -2041,7 +2086,8 @@ async function partB(
     await home.reload({ waitUntil: 'load' });
     await see(home, 'Voting has closed');
     await see(home, 'Your vote for #5 Contestant 5 is in.');
-    await see(home, TOP10_LINE);
+    await see(home, WINNER_LINE);
+    await checkLedePromo(home);
     await shot(home, 'prod-09-vote-closed');
     await press(admin, 'Reopen voting');
     await see(admin, 'Voting is set to open.');

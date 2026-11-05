@@ -69,8 +69,10 @@ export interface EventInfo {
   organiser: string;
   /** How many contestants the vote sends through. */
   advancing: number;
-  /** YYYY-MM-DD (Singapore date) the Top 10 are announced. */
+  /** YYYY-MM-DD (Singapore date) the Top 10 are announced. No longer shown on the page (Revision 12). */
   top10AnnouncedOn: string;
+  /** YYYY-MM-DD (Singapore date) the winner is announced. Shown after a vote (Revision 12). */
+  winnerAnnouncedOn: string;
   /**
    * true while the event title or any voter-facing wording still awaits legal
    * review. Not shown on the page. It stops `npm run deploy` from publishing.

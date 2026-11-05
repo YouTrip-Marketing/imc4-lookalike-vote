@@ -14,7 +14,7 @@ import { DemoVoterPanel } from '../demo/lazy';
 import { checkEmail, type EmailProblem } from '../domain/email';
 import { toVoteError, type VoteError } from '../domain/errors';
 import { newRequestId } from '../domain/requestId';
-import { formatLongCalendarDate, formatSgtDateTime } from '../domain/time';
+import { formatCalendarDateWithYear, formatSgtDateTime } from '../domain/time';
 import type { Contestant, PublicSession, VotingStatus } from '../domain/types';
 import { usePolling } from '../hooks/usePolling';
 import { browserStorage } from '../storage/keyValue';
@@ -272,8 +272,8 @@ export function VoteView({ store }: { store: VoteStore }): JSX.Element {
 
   const opens = formatSgtDateTime(session.state.opensAt);
   const closes = formatSgtDateTime(session.state.closesAt);
-  // Kelicia's wording, Revision 10.
-  const top10Line = `Top ${event.advancing} will be announced ${formatLongCalendarDate(event.top10AnnouncedOn)}.`;
+  // Kelicia's wording, Revision 12 (replaces Revision 10's "Top 10 will be announced ...").
+  const announcementLine = `The winner will be announced on ${formatCalendarDateWithYear(event.winnerAnnouncedOn)}.`;
   const ruleLine = canChange
     ? 'You can switch until voting closes.'
     : 'One vote per person. It cannot be changed once you confirm.';
@@ -299,7 +299,7 @@ export function VoteView({ store }: { store: VoteStore }): JSX.Element {
           {!sending && status === 'closed' && (
             <>
               {votedFor !== undefined && <>Your vote for {nameOf(votedFor)} is in. </>}
-              {top10Line}
+              {announcementLine}
             </>
           )}
           {!sending && status === 'not_open' && (
@@ -315,7 +315,7 @@ export function VoteView({ store }: { store: VoteStore }): JSX.Element {
               ) : (
                 <>Your vote is in. </>
               )}
-              {canChange ? 'Changed your mind? You can switch until voting closes.' : top10Line}
+              {canChange ? 'Changed your mind? You can switch until voting closes.' : announcementLine}
             </>
           )}
           {!sending && status === 'open' && !voted && (
@@ -326,6 +326,8 @@ export function VoteView({ store }: { store: VoteStore }): JSX.Element {
           )}
         </p>
         {!sending && status === 'open' && !voted && <p className="voter__rule">{ruleLine}</p>}
+        {/* Revision 12: the promo straight under the "You voted for" line, above the fold. */}
+        {!sending && voted && status !== 'not_open' && <PromoBannerSlot placement="lede" eager />}
         {!sending && status === 'open' && voted && (
           <button type="button" className="button button--wide voter__see-all" onClick={showAllContestants}>
             See all contestants

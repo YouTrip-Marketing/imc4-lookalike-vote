@@ -7,6 +7,7 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { burstRule, contestants, demo, event, keyVisual, promoBanner, promoDetails, sharedAddressRule, votingRules, votingWindow } from '../event.config';
 import { buildSeedSql } from '../scripts/generate-seed-sql';
+import { formatCalendarDateWithYear } from '../src/domain/time';
 import { effectiveStatus } from '../src/domain/voting';
 
 describe('event.config.ts', () => {
@@ -96,6 +97,18 @@ describe('event.config.ts', () => {
 
   it('has a shared-address flag threshold that can flag something', () => {
     expect(sharedAddressRule.votes).toBeGreaterThanOrEqual(2);
+  });
+
+  it('Revision 12: voting closes Thu 12 Nov 2026 23:59 SGT, and the winner line reads Thu 12 Nov 2026', () => {
+    expect(votingWindow.closesAt).toBe('2026-11-12T23:59:00+08:00');
+    expect(event.winnerAnnouncedOn).toBe('2026-11-12');
+    expect(formatCalendarDateWithYear(event.winnerAnnouncedOn)).toBe('Thu 12 Nov 2026');
+    expect(formatCalendarDateWithYear('not a date')).toBe('not a date');
+  });
+
+  it('Revision 12: Code.gs closes at the same instant as the page', () => {
+    const codeGs = readFileSync(resolve(import.meta.dirname, '..', 'apps-script', 'Code.gs'), 'utf8');
+    expect(codeGs).toContain(`var CLOSES_AT = '${votingWindow.closesAt}';`);
   });
 
   it('words the post-vote "Your vote is in" panel with the CS promo brief facts only (Revision 11)', () => {
