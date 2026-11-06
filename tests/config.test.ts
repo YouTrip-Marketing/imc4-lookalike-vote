@@ -123,8 +123,8 @@ describe('event.config.ts', () => {
       ],
       cta: 'Join the 100 Flights promo',
     });
-    // Public page: never the artist's name.
-    expect(JSON.stringify(promoDetails)).not.toMatch(/jung ?kook|jkook/i);
+    // Revision 13d: "JKook" is allowed in page copy; the artist's full name is not.
+    expect(JSON.stringify(promoDetails)).not.toMatch(/jung ?kook/i);
   });
 
   it('points the promo banner at the supplied creatives (3:1 and 16:9 phone), with the agreed alt text and the YouTrip OneLink', () => {
@@ -144,7 +144,7 @@ describe('event.config.ts', () => {
 });
 
 describe('voter-facing copy', () => {
-  const copy = event.title;
+  const copy = [event.title, event.openHeading, event.openLede].join(' ');
 
   it('carries no purpose line for the email (removed 2026-09-29; the T&Cs hold any purpose statement)', () => {
     const config = JSON.stringify(event);
@@ -153,7 +153,16 @@ describe('voter-facing copy', () => {
     expect(config).not.toMatch(/make sure each person/i);
   });
 
-  it.each([/\bcash\b/i, /\bS\$\s?\d/, /\bprize/i, /\bflights?\b/i, /\bdraw\b/i, /\bKorea\b/i])(
+  it('Revision 13d: carries Kelicia\'s heading and lede verbatim', () => {
+    expect(event.openHeading).toBe('Who’s the ultimate JKook lookalike?');
+    expect(event.openLede).toBe(
+      'We’re celebrating 100 Free Flights to Korea with a search for the ultimate JKook lookalike, and you get to decide who takes the crown! Cast your vote before 12 Nov and tune in to our Instagram livestream @youtripsg that day for the winner reveal.',
+    );
+  });
+
+  // Revision 13d: the lede names the 100 Free Flights to Korea campaign on purpose,
+  // and the vote does decide the winner, so "flights", "Korea" and "winner" are allowed.
+  it.each([/\bcash\b/i, /\bS\$\s?\d/, /\bprize/i, /\bdraw\b/i])(
     'makes no promise about %s',
     (pattern) => {
       expect(copy).not.toMatch(pattern);

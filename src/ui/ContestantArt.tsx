@@ -25,7 +25,8 @@ export function ContestantArt({ contestant, compact = false }: Props): JSX.Eleme
       <img
         className="art art--photo"
         src={contestant.photo}
-        alt={`${contestant.stageName}, contestant ${contestant.number}`}
+        // Revision 13d: the contestant's name only.
+        alt={contestant.stageName}
         // 4:5 portrait tiles, two to a row on a phone. Declaring the size up front
         // stops the grid jumping as photos arrive over a slow connection.
         width={480}

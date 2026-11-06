@@ -271,7 +271,6 @@ export function VoteView({ store }: { store: VoteStore }): JSX.Element {
   const promoAtBottom = (voted || status !== 'open') && !sending;
 
   const opens = formatSgtDateTime(session.state.opensAt);
-  const closes = formatSgtDateTime(session.state.closesAt);
   // Kelicia's wording, Revision 12 (replaces Revision 10's "Top 10 will be announced ...").
   const announcementLine = `The winner will be announced on ${formatCalendarDateWithYear(event.winnerAnnouncedOn)}.`;
   const ruleLine = canChange
@@ -290,7 +289,7 @@ export function VoteView({ store }: { store: VoteStore }): JSX.Element {
                 ? 'Voting opens soon'
                 : voted
                   ? 'Vote in!'
-                  : `Who makes the final ${event.advancing}?`}
+                  : event.openHeading}
         </h1>
         <p className="voter__lede">
           {sending && (
@@ -318,12 +317,8 @@ export function VoteView({ store }: { store: VoteStore }): JSX.Element {
               {canChange ? 'Changed your mind? You can switch until voting closes.' : announcementLine}
             </>
           )}
-          {!sending && status === 'open' && !voted && (
-            <>
-              Vote your favourite lookalike now!
-              {closes !== '' && <> Voting closes {closes}.</>}
-            </>
-          )}
+          {/* Revision 13d: Kelicia's lede, from config. The "voting closes" pill carries the exact time. */}
+          {!sending && status === 'open' && !voted && <>{event.openLede}</>}
         </p>
         {!sending && status === 'open' && !voted && <p className="voter__rule">{ruleLine}</p>}
         {/* Revision 12: the promo straight under the "You voted for" line, above the fold. */}

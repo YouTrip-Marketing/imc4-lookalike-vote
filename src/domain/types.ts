@@ -67,6 +67,10 @@ export interface EventInfo {
   /** Short, stable id. Separates this event's browser storage and vote hashes from any other. */
   id: string;
   title: string;
+  /** Revision 13d: the heading while voting is open and this browser has not voted. */
+  openHeading: string;
+  /** Revision 13d: the paragraph under that heading. Plain text. */
+  openLede: string;
   organiser: string;
   /** How many contestants the vote sends through. */
   advancing: number;

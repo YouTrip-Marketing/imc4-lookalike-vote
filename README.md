@@ -1,8 +1,8 @@
 # IMC 4 lookalike contest: public voting site
 
 The online public voting round. **Revision 13 (6 Nov 2026): the Top 10 round**, 10
-contestants, heading "Who makes the final 3?" (`event.advancing: 3`, an assumption
-from Terry's "final-3 vote", not yet confirmed by Kelicia). The Top 20 round ran
+contestants, heading "Who’s the ultimate JKook lookalike?" (Revision 13d). The admin view still
+ranks a "Top 3" (`event.advancing: 3`); nothing public says "final 3". The Top 20 round ran
 26 Oct to 5 Nov. Voters arrive from Instagram,
 tap a contestant, type their email, confirm, done. The site is the single official count: it
 replaces "comment the number" voting.
@@ -868,7 +868,7 @@ Without both, `/api/vote` answers `misconfigured` and the page shows "The voting
 2. **Key visual edge to edge.** It sits outside the padded column, with no side or top gap and no rounded corners, up to 1920px wide. On desktop this makes it much taller than before (427px at 1280). Option B, a re-cut with a bigger title lockup, needs design.
 3. **Brand line removed** from the voting page. The key visual carries the title. The admin view keeps it.
 4. **Green dot** on "Voting open". Grey before voting opens, red once closed.
-5. **Headline, her line under it:** the H1 is "Who makes the final 3?" since Revision 13 (from `event.advancing`; was "Who makes the Top 10?", kept by Kelicia on 13 Oct). Under it: "Vote your favourite lookalike now! Voting closes Thu 12 Nov, 11:59pm SGT." (date from `votingWindow`).
+5. **Headline and lede (Revision 13d, Kelicia 6 Nov 2026, verbatim, `event.openHeading` / `event.openLede`):** "Who’s the ultimate JKook lookalike?" then "We’re celebrating 100 Free Flights to Korea with a search for the ultimate JKook lookalike, and you get to decide who takes the crown! Cast your vote before 12 Nov and tune in to our Instagram livestream @youtripsg that day for the winner reveal." The rule line stays under it. (Was "Who makes the final 3?" / "Vote your favourite lookalike now! Voting closes ...".) The public vote decides the winner, so the post-vote winner line stands.
 6. **Rule line:** "One vote per person. It cannot be changed once you confirm." It also appears in the confirm sheet.
 7. **Promo pop-up after a vote** (`PromoPopup` in `src/ui/PromoBanner.tsx`). It holds the creative and a Close button, and links to `promoBanner.href` once that is set. Before a vote the promo is not on the page. Once voted, or when voting is not open, it also sits at the bottom.
 8. **Revision 11 (5 Nov 2026): "Your vote is in" panel replaces the image-only pop-up.** Same mechanics (opens once the vote is counted, Back or backdrop closes it). It shows the heading ("Your vote for #7 Name is in"), the 100 Flights creative, four short lines, a "Join the 100 Flights promo" button to `promoBanner.href` (new tab) and Close. All wording lives in `promoDetails` in `event.config.ts`. At 360 x 640 it fits without scrolling; shorter screens scroll inside the panel.

@@ -109,8 +109,9 @@ const CHROME_CANDIDATES = [
 
 const DUPLICATE = 'A vote has already been counted for this email.';
 // Revision 10: Kelicia's wording, verbatim.
-const OPEN_H1 = `Who makes the final ${event.advancing}?`;
-const OPEN_LEDE = 'Vote your favourite lookalike now! Voting closes Thu 12 Nov, 11:59pm SGT.';
+// Revision 13d: Kelicia's heading and lede, from config.
+const OPEN_H1 = event.openHeading;
+const OPEN_LEDE = event.openLede;
 const RULE_LINE = 'One vote per person. It cannot be changed once you confirm.';
 // Revision 12: the winner line replaces "Top 10 will be announced ...".
 const WINNER_LINE = `The winner will be announced on ${formatCalendarDateWithYear(event.winnerAnnouncedOn)}.`;
@@ -648,7 +649,7 @@ async function partC(
     await see(voter, 'TEST SITE');
     await see(voter, 'Votes are not real.');
     assert.equal(await cardsDisabled(voter), false);
-    await see(voter, `Voting closes ${formatSgtDateTime(votingWindow.closesAt)}.`);
+    await see(voter, `voting closes ${formatSgtDayMonth(votingWindow.closesAt)}`); // Revision 13d: the pill carries the date; the lede is Kelicia's copy.
   });
 
   await step('sheet build: a vote becomes one row (time, email typed and canonical, self-reported IP, contestant, device)', async () => {
@@ -742,7 +743,7 @@ async function partD(
   await step('production sheet build, real config: open now (26 Oct), no banner, no "Voting opens" text, placeholders while the tab is empty', async () => {
     const page = await open(await browser.createBrowserContext(), `${closedSite}${PAGES_BASE}`);
     await see(page, OPEN_H1);
-    await see(page, `Vote your favourite lookalike now! Voting closes ${formatSgtDateTime(votingWindow.closesAt)}.`);
+    await see(page, OPEN_LEDE);
     const body = await text(page);
     assert.equal(/TEST SITE|DEMO DATA|Demo controls|ORGANISER TEST/.test(body), false, 'a test/demo banner is on the production page');
     assert.equal(/Voting opens|not open yet/i.test(body), false, 'closed-state text is showing');
@@ -862,7 +863,7 @@ async function partD(
     // Placeholders keep their look.
     assert.equal(await voter.$('.grid .card__art--photo .art--placeholder'), null);
     const alt = await voter.$eval('.grid > li:nth-child(7) .art--photo', (img) => (img as HTMLImageElement).alt);
-    assert.equal(alt, 'Dry Run 07, contestant 7');
+    assert.equal(alt, 'Dry Run 07');
     await voter.evaluate(() => window.scrollTo(0, 0));
     await shot(voter, 'prod-sheet-390-0-runtime-top20');
   });
@@ -913,7 +914,7 @@ async function partA(browser: Browser, site: string): Promise<void> {
     await see(voter, 'DEMO DATA');
     assert.equal((await voter.$$('.grid > li')).length, 10);
     assert.equal(await cardsDisabled(voter), false);
-    await see(voter, `Voting closes ${formatSgtDateTime(votingWindow.closesAt)}.`);
+    await see(voter, `voting closes ${formatSgtDayMonth(votingWindow.closesAt)}`); // Revision 13d: the pill carries the date.
     await shot(voter, 'demo-01-vote-open');
   });
 
@@ -937,9 +938,10 @@ async function partA(browser: Browser, site: string): Promise<void> {
       assert.ok(pill.bottom <= heading, 'a status pill overlaps the heading');
     }
     assert.equal(await voter.$eval('.voter__intro h1', (node) => node.textContent), OPEN_H1);
-    assert.equal(OPEN_H1, 'Who makes the final 3?');
+    assert.equal(OPEN_H1, 'Who’s the ultimate JKook lookalike?');
     assert.equal(await voter.$eval('.voter__lede', (node) => node.textContent), OPEN_LEDE);
-    assert.equal(OPEN_LEDE, `Vote your favourite lookalike now! Voting closes ${formatSgtDateTime(votingWindow.closesAt)}.`);
+    assert.ok(OPEN_LEDE.startsWith('We\u2019re celebrating 100 Free Flights to Korea') && OPEN_LEDE.endsWith('for the winner reveal.'), OPEN_LEDE);
+    assert.equal(/final 3/i.test(await text(voter)), false, 'the public page still says "final 3"');
     assert.equal(await voter.$eval('.voter__rule', (node) => node.textContent), RULE_LINE);
   });
 
@@ -981,7 +983,8 @@ async function partA(browser: Browser, site: string): Promise<void> {
       assert.equal(body.includes(removed), false, `page still says "${removed}"`);
     }
     assert.equal(await voter.$('.voter__footer'), null);
-    for (const banned of [/people.s choice/i, /flights?/i, /\bdraw\b/i, /\bcash\b/i, /prize/i, /\bQR\b/]) {
+    // Revision 13d: the lede names 100 Free Flights to Korea on purpose, so "flights" is no longer banned.
+    for (const banned of [/people.s choice/i, /\bdraw\b/i, /\bcash\b/i, /prize/i, /\bQR\b/]) {
       assert.equal(banned.test(body), false, `page mentions ${String(banned)}`);
     }
   });
