@@ -451,6 +451,14 @@ the marker and reopens the ballot. It gains nobody a second vote.
 The public session tells the page nothing about any voter. The page cannot ask
 "has this email voted?" without casting a vote.
 
+### Close voting now (Revision 15, for the 12 Nov livestream)
+
+**Admin note for Kelicia:** to close voting during the livestream, open the "Voting site" sheet, go to the **Settings** tab and tick the box in **B1**. Votes stop at once; pages that are open switch to "Voting has closed" within about a minute. Untick it to reopen (only until the 12 Nov 23:59 hard close).
+
+How it works: Code.gs reads Settings!B1 on every vote (no cache) and refuses with `voting_closed`. Pages ask `/api/vote?view=status` every 30 seconds. Code.gs caches that answer for 20 seconds, and the Pages Function keeps it at Cloudflare's edge for 20 seconds, so Apps Script sees a few status requests a minute whatever the audience. That makes the worst case about 70 seconds for an open page to show "closed"; a vote sent in that time is refused by the sheet anyway. With no Settings tab, or B1 unticked, voting follows OPENS_AT / CLOSES_AT alone, and an organiser test vote (admin passcode) still goes through. If the status cannot be read, the page stays open, and the sheet still refuses votes.
+
+Setup, once: add a tab named exactly **Settings**; A1 `Voting closed now?`; B1 a checkbox (Insert > Checkbox), unticked.
+
 ### Top 10 contestants: the Contestants tab (no republish)
 
 **Revision 13:** 10 contestants. Code.gs reads only No. 1 to 10 (`CONTESTANT_COUNT = 10`); rows 11 to 20 are ignored even if filled. The page shows 10 cards (`contestants` in `event.config.ts`). `event.id` is now `imc4-top10-vote`, so every phone forgets its Top 20 "I voted" note.

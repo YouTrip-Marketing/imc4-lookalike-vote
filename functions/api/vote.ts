@@ -45,6 +45,12 @@ const SHEET_ENDPOINT =
 const MAX_BODY_BYTES = 4096;
 const MAX_TOKEN_LENGTH = 2048;
 const UPSTREAM_TIMEOUT_MS = 20_000;
+/**
+ * Revision 15 "close now": every open page asks ?view=status every 30 seconds.
+ * Cloudflare keeps the answer this long at the edge, so Apps Script sees a few
+ * requests a minute however many people have the page open.
+ */
+export const STATUS_EDGE_SECONDS = 20;
 
 const HEADERS = {
   'Content-Type': 'application/json; charset=utf-8',
@@ -110,13 +116,53 @@ async function forward(fetchImpl: typeof fetch, url: string, init: RequestInit):
   });
 }
 
-export async function relay(request: Request, env: Env, fetchImpl: typeof fetch = fetch): Promise<Response> {
+/** The part of the Workers Cache API this file uses (caches.default on Cloudflare). */
+export interface EdgeCache {
+  match(request: Request): Promise<Response | undefined>;
+  put(request: Request, response: Response): Promise<void>;
+}
+
+function defaultEdgeCache(): EdgeCache | undefined {
+  const storage = (globalThis as { caches?: { default?: EdgeCache } }).caches;
+  return storage?.default;
+}
+
+/** ?view=status: the "close now" switch, from the edge cache when fresh, else from Apps Script. */
+async function status(fetchImpl: typeof fetch, endpoint: string, url: URL, cache: EdgeCache | undefined): Promise<Response> {
+  const key = new Request(`${url.origin}${url.pathname}?view=status`, { method: 'GET' });
+  const hit = cache === undefined ? undefined : await cache.match(key);
+  if (hit !== undefined) return hit;
+  const upstream = await forward(fetchImpl, `${endpoint}?view=status`, { method: 'GET' });
+  const text = await upstream.text();
+  let ok = false;
+  try {
+    ok = upstream.status === 200 && (JSON.parse(text) as { ok?: unknown }).ok === true;
+  } catch {
+    ok = false;
+  }
+  // Only a good answer is kept; a failure is passed on and asked again next time.
+  const headers = { ...HEADERS, 'Cache-Control': ok ? `public, max-age=${STATUS_EDGE_SECONDS}` : 'no-store' };
+  const response = new Response(text, { status: upstream.status, headers });
+  if (ok && cache !== undefined) await cache.put(key, response.clone());
+  return response;
+}
+
+export async function relay(
+  request: Request,
+  env: Env,
+  fetchImpl: typeof fetch = fetch,
+  edgeCache: EdgeCache | undefined = defaultEdgeCache(),
+): Promise<Response> {
   const endpoint = (env.SHEET_ENDPOINT ?? '').trim();
   const secret = (env.TURNSTILE_SECRET_KEY ?? '').trim();
   if (!SHEET_ENDPOINT.test(endpoint) || secret === '') return answer({ ok: false, error: 'misconfigured' });
 
   if (request.method === 'GET') {
-    return forward(fetchImpl, `${endpoint}${new URL(request.url).search}`, { method: 'GET' });
+    const url = new URL(request.url);
+    if (url.searchParams.get('view') === 'status' && [...url.searchParams.keys()].length === 1) {
+      return status(fetchImpl, endpoint, url, edgeCache);
+    }
+    return forward(fetchImpl, `${endpoint}${url.search}`, { method: 'GET' });
   }
   if (request.method !== 'POST') return answer({ ok: false, error: 'invalid_vote' }, 405);
 

@@ -17,7 +17,7 @@ import { createContext, runInContext } from 'node:vm';
 
 export const CODE_GS_PATH = resolve(import.meta.dirname, '..', 'apps-script', 'Code.gs');
 
-type Cell = string | number | Date;
+type Cell = string | number | boolean | Date;
 
 export class FakeSheet {
   readonly rows: Cell[][] = [];
@@ -90,6 +90,8 @@ export interface AppsScriptOptions {
   contestants?: (string | number)[][];
   /** Lets http://127.0.0.1 photo addresses through (the e2e stub serves the photos). */
   localPhotos?: boolean;
+  /** Revision 15: a "Settings" tab with B1 = this value ("close now"). Omit for no Settings tab. */
+  closedNow?: boolean | string;
 }
 
 /** The real Code.gs constants, read from the file (for parity tests). */
@@ -106,6 +108,11 @@ export function loadAppsScript(options: AppsScriptOptions = {}): AppsScriptRun {
     const sheet = new FakeSheet();
     sheet.rows.push(['No.', 'Name', 'Instagram handle', 'Tagline', 'Photo'], ...options.contestants.map((row) => [...row]));
     tabs.set('Contestants', sheet);
+  }
+  if (options.closedNow !== undefined) {
+    const settings = new FakeSheet();
+    settings.rows.push(['Voting closed now?', options.closedNow]);
+    tabs.set('Settings', settings);
   }
   let lockHeld = false;
   const RealDate = Date;

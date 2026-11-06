@@ -71,6 +71,12 @@ export interface SheetStoreOptions {
    * refuses every vote without one.
    */
   humanToken?: () => Promise<string>;
+  /**
+   * Revision 15 "close now": while the window says open, ask the sheet
+   * (?view=status) whether the organiser has closed voting early. If the
+   * question fails the page stays open; Code.gs still refuses the vote.
+   */
+  followCloseSwitch?: boolean;
 }
 
 const IP_PATTERN = /^[0-9A-Fa-f:.]{3,45}$/;
@@ -285,7 +291,21 @@ export class SheetVoteStore implements VoteStore {
    * (votingRules.publicCounts) are not available with this store.
    */
   async getSession(): Promise<PublicSession> {
-    return { state: this.state(), tallies: null };
+    const state = this.state();
+    if (state.status === 'open' && this.options.followCloseSwitch === true && !this.isDemo && this.organiserKey === null) {
+      if (await this.closedNow()) return { state: { ...state, status: 'closed' }, tallies: null };
+    }
+    return { state, tallies: null };
+  }
+
+  /** The organiser's "close now" switch (Settings!B1 via ?view=status). False when it cannot be read. */
+  private async closedNow(): Promise<boolean> {
+    try {
+      const data = (await this.request({ method: 'GET' }, '?view=status')) as { closedNow?: unknown } | null;
+      return data !== null && typeof data === 'object' && data.closedNow === true;
+    } catch {
+      return false;
+    }
   }
 
   /** The Contestants tab, from the reveal. Never throws for bad rows: they are dropped. */
@@ -410,6 +430,8 @@ export function createSheetStore(
       ? {}
       : { ipLookupUrl: ipLookupUrl === undefined || ipLookupUrl.trim() === '' ? DEFAULT_IP_LOOKUP_URL : ipLookupUrl.trim() }),
     ...(siteKey === '' ? {} : { humanToken: () => turnstileToken(siteKey) }),
+    // The test site is always open by design; production follows the switch.
+    followCloseSwitch: !testMode,
   });
   // Start the lookup while the page loads, so it is ready by the time someone votes.
   if (!relay) void store.lookupIp();

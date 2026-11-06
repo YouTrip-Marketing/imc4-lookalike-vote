@@ -677,7 +677,7 @@ async function partC(
 ): Promise<void> {
   const context = await browser.createBrowserContext();
   const voter = await open(context, `${site}/`, { userAgent: INSTAGRAM_UA });
-  const rows = (): (string | number | Date)[][] => stub.script.votes()?.rows.slice(1) ?? [];
+  const rows = (): (string | number | boolean | Date)[][] => stub.script.votes()?.rows.slice(1) ?? [];
 
   await step('sheet build: TEST SITE banner, voting open today, configured close time shown', async () => {
     await see(voter, 'TEST SITE');
@@ -925,6 +925,32 @@ async function partD(
     const rows = openStub.script.votes()?.rows.slice(1) ?? [];
     assert.deepEqual(rows.map((row) => row[8]), [false, true]);
     await other.close();
+  });
+
+  await step('Rev 15: the organiser ticks "close now" (Settings!B1): the page shows voting closed, and votes are refused', async () => {
+    const settings = openStub.script.tab('Settings')?.rows[0];
+    assert.ok(settings !== undefined, 'the stub has no Settings tab');
+    const page = await open(await browser.createBrowserContext(), `${openSite}${PAGES_BASE}`);
+    await see(page, OPEN_H1);
+    settings[1] = true;
+    openStub.script.clearCache();
+    await page.reload({ waitUntil: 'load' });
+    await see(page, 'Voting has closed');
+    assert.equal(await page.$('.pill--closes'), null, 'the closes pill shows after a close-now');
+    assert.equal(await cardsDisabled(page), true);
+    assert.deepEqual((await openDetail(page, 2)).buttons, ['Close'], 'Vote offered after close-now');
+    await press(page, 'Close', 'dialog.sheet--detail');
+    const refused = openStub.script.doPost(
+      JSON.stringify({ contestantNumber: 4, contestantName: 'Dry Run 04', email: 'late@example.com', voteId: 'e2e-close-now-01', device: 'x', ip: 'unavailable' }),
+    ).json;
+    assert.deepEqual(refused, { ok: false, error: 'voting_closed' });
+    await shot(page, 'prod-sheet-390-4-closed-now');
+    // Unticked again: open again (before the hard close).
+    settings[1] = false;
+    openStub.script.clearCache();
+    await page.reload({ waitUntil: 'load' });
+    await see(page, OPEN_H1);
+    await page.close();
   });
 
   await context.close();
@@ -2477,6 +2503,8 @@ async function main(): Promise<void> {
       adminKey: SHEET_ADMIN,
       contestants: dryRunContestants(SHEET_STUB_PROD_OPEN_PORT),
       localPhotos: true,
+      // Revision 15: a Settings tab, "close now" unticked.
+      closedNow: false,
     });
     const openWindowConfig = join(BUILDS, 'open-window-config.ts');
     writeFileSync(

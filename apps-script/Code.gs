@@ -65,6 +65,14 @@ var CLOSES_AT = '2026-11-12T23:59:00+08:00';
 /** Contestant names and photos are public from this instant, when voting opens. */
 var REVEAL_AT = OPENS_AT;
 var CONTESTANTS_TAB = 'Contestants';
+/**
+ * "Close now" (Revision 15): the organiser ticks Settings!B1 during the
+ * livestream. Votes are refused from that moment (doPost reads the cell on every
+ * vote, no cache); pages see it through doGet?view=status (cached briefly).
+ * No Settings tab, or B1 not ticked: voting follows OPENS_AT / CLOSES_AT alone.
+ */
+var SETTINGS_TAB = 'Settings';
+var STATUS_CACHE_SECONDS = 20;
 var CONTESTANTS_CACHE_SECONDS = 60;
 /** Tests only (scripts/apps-script-harness.ts): lets http://127.0.0.1 photo addresses through. */
 var LOCAL_PHOTOS_FOR_TESTS = false;
@@ -161,6 +169,7 @@ function doPost(e) {
     var now0 = new Date().getTime();
     if (now0 < new Date(OPENS_AT).getTime()) return reply_({ ok: false, error: 'voting_not_open' });
     if (now0 >= new Date(CLOSES_AT).getTime()) return reply_({ ok: false, error: 'voting_closed' });
+    if (closedNow_()) return reply_({ ok: false, error: 'voting_closed' });
   }
 
   var lock = LockService.getScriptLock();
@@ -214,6 +223,9 @@ function doPost(e) {
 }
 
 function doGet(e) {
+  if (e && e.parameter && e.parameter.view === 'status') {
+    return reply_({ ok: true, data: statusAnswer_() });
+  }
   if (e && e.parameter && e.parameter.view === 'contestants') {
     return reply_({ ok: true, data: contestantsAnswer_(isAdmin_(e.parameter.key)) });
   }
@@ -307,6 +319,28 @@ function photoAddress_(value) {
  * the Apps Script project lives (bound to the sheet or standalone), as long as
  * the deploying account can edit the sheet. null if it cannot be opened.
  */
+// ---------------------------------------------------------------- close now
+
+/** True when the organiser has ticked Settings!B1 ("close now"). Read fresh, never cached. */
+function closedNow_() {
+  var book = book_();
+  if (book === null) return false;
+  var sheet = book.getSheetByName(SETTINGS_TAB);
+  if (sheet === null) return false;
+  var value = sheet.getRange(1, 2, 1, 1).getValues()[0][0];
+  return value === true || String(value).trim().toUpperCase() === 'TRUE';
+}
+
+/** { closedNow }: public, nothing about voters. Cached STATUS_CACHE_SECONDS for the pages' polling. */
+function statusAnswer_() {
+  var cache = CacheService.getScriptCache();
+  var cached = cache.get('status');
+  if (cached !== null) return JSON.parse(cached);
+  var data = { closedNow: closedNow_() };
+  cache.put('status', JSON.stringify(data), STATUS_CACHE_SECONDS);
+  return data;
+}
+
 function book_() {
   try {
     return SpreadsheetApp.openById(SHEET_ID);
