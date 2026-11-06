@@ -144,6 +144,11 @@ describe('event.config.ts', () => {
 });
 
 describe('voter-facing copy', () => {
+  it('6 Nov 2026: the title (browser tab, admin brand line) is "JKook Lookalike", never the artist\'s full name', () => {
+    expect(event.title).toBe('JKook Lookalike');
+    expect(event.title).not.toMatch(/jung\s*-?\s*kook/i);
+  });
+
   const copy = [event.title, event.openHeading, event.openLede].join(' ');
 
   it('carries no purpose line for the email (removed 2026-09-29; the T&Cs hold any purpose statement)', () => {

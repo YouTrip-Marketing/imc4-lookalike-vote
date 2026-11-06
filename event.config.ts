@@ -40,10 +40,10 @@ export const event: EventInfo = {
   // Top 20 "I voted" note (the id keys the browser's vote marker, nothing else).
   id: 'imc4-top10-vote',
 
-  // LEGAL GATE: naming the artist in public-facing assets is pending legal review.
-  // This is the only place the event title is written. Change it here and every
-  // view and the browser tab follow. Working title for this internal draft only.
-  title: 'Jungkook Lookalike Contest',
+  // The only place the event title is written: the browser tab ("Vote | ...")
+  // and the admin brand line follow. 6 Nov 2026 (Kelicia approved): "JKook
+  // Lookalike", the name Legal cleared. Never the artist's full name.
+  title: 'JKook Lookalike',
 
   organiser: 'YouTrip',
   // Revision 13 ASSUMPTION (Chief of Staff, 6 Nov 2026; Terry calls the next
