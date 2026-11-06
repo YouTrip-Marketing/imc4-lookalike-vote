@@ -137,16 +137,17 @@ export const promoBanner: PromoBanner = {
 /**
  * Revision 11 (Kelicia, 5 Nov 2026): the post-vote panel. Heading, the promo
  * image above, these lines, then a button to promoBanner.href and Close.
- * Facts from the CS promo brief only. Edit the wording here, not in components.
+ * Lines replaced 6 Nov 2026 with Kelicia's wording, verbatim (her casing and
+ * punctuation). Edit the wording here, not in components.
  */
 export const promoDetails: PromoDetails = {
   heading: 'Your vote is in',
   headingWithName: 'Your vote for {name} is in',
   lines: [
-    '100 Flights to Korea: 28 Oct to 31 Dec 2026.',
-    'New to YouTrip? Sign up with promo code FLY100KR.',
-    'Already on YouTrip? Tap "Join now" on the 100 Flights banner in the app, then spend S$500 within the campaign period.',
-    'Winners drawn 31 Jan 2027. T&Cs apply.',
+    'YouTrip is giving away 100 free flights to Korea from now till 31 Dec 2026',
+    'New to YouTrip? Sign up with Promo code FLY100KR',
+    'Already on YouTrip? Tap "Join now" in your YouTrip app and spend S$500 during the campaign period. PLUS, get 3x more chances with every Child account created.',
+    'T&Cs apply',
   ],
   cta: 'Join the 100 Flights promo',
 };

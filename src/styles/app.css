@@ -1572,13 +1572,14 @@ a.promo-banner:focus-visible {
 }
 
 .sheet--promo h2 {
-  margin-bottom: 14px;
+  margin-bottom: 10px;
 }
 
+/* Tightened 6 Nov 2026 so Kelicia's longer lines still fit a 360 x 640 phone without scrolling. */
 .promo-details {
   display: grid;
-  gap: 6px;
-  margin: 14px 0 0;
+  gap: 4px;
+  margin: 10px 0 0;
   padding: 0 0 0 18px;
   list-style: disc;
   color: var(--muted);
