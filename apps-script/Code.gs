@@ -25,7 +25,7 @@
  *           admin passcode (?key=...), checked against ADMIN_KEY_SHA256 below,
  *           so running totals are not public.
  *
- *   doGet?view=contestants  the Top 20 from the "Contestants" tab (No., Name,
+ *   doGet?view=contestants  the Top 10 from the "Contestants" tab (No., Name,
  *           Instagram handle, Tagline, Photo = a Google Drive share link or an
  *           https image address), for the page to show. Public, but EMPTY until
  *           REVEAL_AT (the reveal is 2 Nov 12:00 SGT), so filling the tab early
@@ -62,7 +62,7 @@ var VOTES_TAB = 'Votes';
 /** Same instants as votingWindow in event.config.ts. */
 var OPENS_AT = '2026-10-26T00:00:00+08:00';
 var CLOSES_AT = '2026-11-12T23:59:00+08:00';
-/** Contestant names and photos are public from this instant: the Top 20 reveal, when voting opens. */
+/** Contestant names and photos are public from this instant, when voting opens. */
 var REVEAL_AT = OPENS_AT;
 var CONTESTANTS_TAB = 'Contestants';
 var CONTESTANTS_CACHE_SECONDS = 60;
@@ -70,7 +70,7 @@ var CONTESTANTS_CACHE_SECONDS = 60;
 var LOCAL_PHOTOS_FOR_TESTS = false;
 /** SHA-256 (hex) of the admin passcode. The passcode itself is never in this file. */
 var ADMIN_KEY_SHA256 = '0025f030d4ebb2462d18c614e97cd3ff9a4b2cf61b54f61968bf33385d0e1661';
-var CONTESTANT_COUNT = 20;
+var CONTESTANT_COUNT = 10;
 var TIME_ZONE = 'Asia/Singapore';
 var HEADER = [
   'Timestamp (SGT)', 'Email (as typed)', 'Canonical email', 'IP (self-reported)', 'Contestant no.',

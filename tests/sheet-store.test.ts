@@ -153,10 +153,10 @@ describe('the sheet store (test site)', () => {
     const script = loadAppsScript({ adminKey: ADMIN });
     const sheet = store({ fetch: fetchInto(script) });
     await sheet.castVote('c07', 'alice@example.com', 'req-0001-aaaa');
-    await sheet.castVote('c12', 'bob@example.com', 'req-0002-bbbb');
+    await sheet.castVote('c09', 'bob@example.com', 'req-0002-bbbb');
     await sheet.castVote('c07', 'carol@example.com', 'req-0003-cccc');
     const snapshot = await sheet.adminGetSnapshot(ADMIN);
-    expect(snapshot.votes.map((v) => v.contestantId)).toEqual(['c07', 'c12', 'c07']);
+    expect(snapshot.votes.map((v) => v.contestantId)).toEqual(['c07', 'c09', 'c07']);
     expect(snapshot.votes.every((v) => /^[0-9a-f]{8}$/.test(v.voterRef) && v.replacedAt === null)).toBe(true);
     expect(JSON.stringify(snapshot)).not.toMatch(/@example\.com/);
   });
@@ -279,7 +279,7 @@ describe('the runtime Top 20', () => {
       { number: 7, stageName: 'Kim Lookalike', handle: '@kim', tagline: '', photo: 'https://example.com/07.jpg' },
       { number: 3, stageName: '', handle: '', tagline: '', photo: '' },
     ]);
-    expect(merged).toHaveLength(20);
+    expect(merged).toHaveLength(10);
     expect(merged[6]).toMatchObject({ id: 'c07', number: 7, stageName: 'Kim Lookalike', handle: '@kim', photo: 'https://example.com/07.jpg' });
     expect(merged[2]).toEqual(contestants[2]);
   });

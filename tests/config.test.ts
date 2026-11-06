@@ -11,10 +11,10 @@ import { formatCalendarDateWithYear } from '../src/domain/time';
 import { effectiveStatus } from '../src/domain/voting';
 
 describe('event.config.ts', () => {
-  it('has 20 contestants, numbered 1 to 20, with unique ids', () => {
-    expect(contestants).toHaveLength(20);
-    expect(contestants.map((c) => c.number)).toEqual(Array.from({ length: 20 }, (_, i) => i + 1));
-    expect(new Set(contestants.map((c) => c.id)).size).toBe(20);
+  it('has 10 contestants (Revision 13, the Top 10), numbered 1 to 10, with unique ids', () => {
+    expect(contestants).toHaveLength(10);
+    expect(contestants.map((c) => c.number)).toEqual(Array.from({ length: 10 }, (_, i) => i + 1));
+    expect(new Set(contestants.map((c) => c.id)).size).toBe(10);
   });
 
   it('uses generated placeholders only: no photo of anyone is configured', () => {
@@ -22,7 +22,7 @@ describe('event.config.ts', () => {
   });
 
   it('sends 10 through', () => {
-    expect(event.advancing).toBe(10);
+    expect(event.advancing).toBe(3);
   });
 
   it('defaults to no vote changes and counts hidden (one vote per email is fixed, not a setting)', () => {

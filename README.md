@@ -1,6 +1,9 @@
 # IMC 4 lookalike contest: public voting site
 
-The online public voting round, Top 20 to Top 10. Voters arrive from Instagram,
+The online public voting round. **Revision 13 (6 Nov 2026): the Top 10 round**, 10
+contestants, heading "Who makes the final 3?" (`event.advancing: 3`, an assumption
+from Terry's "final-3 vote", not yet confirmed by Kelicia). The Top 20 round ran
+26 Oct to 5 Nov. Voters arrive from Instagram,
 tap a contestant, type their email, confirm, done. The site is the single official count: it
 replaces "comment the number" voting.
 
@@ -446,12 +449,15 @@ the marker and reopens the ballot. It gains nobody a second vote.
 The public session tells the page nothing about any voter. The page cannot ask
 "has this email voted?" without casting a vote.
 
-### Top 20 contestants: the Contestants tab (no republish)
+### Top 10 contestants: the Contestants tab (no republish)
+
+**Revision 13:** 10 contestants. Code.gs reads only No. 1 to 10 (`CONTESTANT_COUNT = 10`); rows 11 to 20 are ignored even if filled. The page shows 10 cards (`contestants` in `event.config.ts`). `event.id` is now `imc4-top10-vote`, so every phone forgets its Top 20 "I voted" note.
+
 The page reads names, Instagram handles, taglines and photos from the **Contestants** tab of "Voting site", through Code.gs, **as soon as it is filled in** (the reveal time equals the opening, 26 Oct). Rows left blank keep their placeholders. Nothing needs rebuilding or republishing.
 
 | Column | What to put |
 |---|---|
-| No. | 1 to 20, already filled. The order of the Instagram posts. Do not change. |
+| No. | 1 to 10 (Revision 13; was 1 to 20). The order of the Instagram posts. Do not change. |
 | Name | The contestant's stage name (up to 40 characters). Blank = "Contestant N" stays. |
 | Instagram handle | Optional. `@name` or `name`. Anything that is not a handle is dropped. |
 | Tagline | Optional, up to 40 characters (e.g. a town). |
@@ -463,7 +469,7 @@ Timings: the sheet caches the list for 60 seconds, the page asks once a minute u
 
 **1 Nov procedure (about 20 minutes):**
 1. Kelicia fills Name (and the optional columns) for 1 to 20 and pastes each photo's Drive link. Blank names are shaded yellow.
-2. Check before the reveal: `npx tsx scripts/contestants-check.ts <passcode file>`. It prints, for each number, whether the name and photo are OK (it uses the admin passcode to see the list early). Fix anything MISSING and run it again until it says 20/20.
+2. Check before the reveal: `npx tsx scripts/contestants-check.ts <passcode file>`. It prints, for each number, whether the name and photo are OK (it uses the admin passcode to see the list early). Fix anything MISSING and run it again until it says 10/10 (it counts `contestants` in `event.config.ts`).
 3. At 2 Nov 12:00 the page shows them by itself. No publish step.
 
 ### Custom domain later (CNAME)
@@ -662,7 +668,7 @@ either arrangement.
 
 ### Bot protection
 
-This is a public link that 20 contestants will push to their followers. Expect
+This is a public link that the contestants (20, now 10) will push to their followers. Expect
 people to try scripts. What is built in:
 
 - One counted vote per email hash, enforced by a unique index and a per-voter
@@ -780,7 +786,7 @@ either removed paragraph comes back.
 
 **Vote store:** Kelicia's private Google Sheet **"Voting site"** ([`1ir3Umrw3Xq_ImhOA08Qcdj4aXD06LRuJSoDvCFLMqKI`](https://docs.google.com/spreadsheets/d/1ir3Umrw3Xq_ImhOA08Qcdj4aXD06LRuJSoDvCFLMqKI)) through `apps-script/Code.gs`, which refuses to write to any other spreadsheet. (The 13 Oct sheet `1nq_hyB…` is the test target only.)
 
-**Tally tab** (live, formula-only, nothing for Code.gs to maintain): **Total votes** headline (B1), Refused repeats (B2), Last vote at (B3, the latest counted vote's SGT timestamp), a note that it updates live, then Rank / No. / Contestant name / Votes for 1 to 20. Votes per contestant are `COUNTIFS(Votes!E:E, no., Votes!I:I, FALSE)`: they depend on Votes column E (Contestant no.) and I (Duplicate?), so re-check them after any change to Code.gs's column order. Replace the "Contestant N" names when the real Top 20 are known. Code.gs enforces the voting window (open from 26 Oct 2026 00:00 to 12 Nov 23:59 SGT per Kelicia (close moved from 5 Nov in Revision 12), 26 Oct: "live anytime"; same as `event.config.ts`, unit-tested), one vote per email, and the admin passcode for the tally. The page shows no banner and follows the same window. Admin Open/Close is disabled: the window opens and closes by itself.
+**Tally tab** (live, formula-only, nothing for Code.gs to maintain): **Total votes** headline (B1), Refused repeats (B2), Last vote at (B3, the latest counted vote's SGT timestamp), a note that it updates live, then Rank / No. / Contestant name / Votes for 1 to 20 (Revision 13: only 1 to 10 can receive votes now; rows for 11 to 20 stay at 0 and can be deleted). Votes per contestant are `COUNTIFS(Votes!E:E, no., Votes!I:I, FALSE)`: they depend on Votes column E (Contestant no.) and I (Duplicate?), so re-check them after any change to Code.gs's column order. The names follow the Contestants tab. **Before the Top 10 round:** copy the Votes tab to "Votes Top 20" and clear rows 2 and below of Votes, or every Top 20 voter is refused as a repeat and their old votes count for the new numbers 1 to 10. Code.gs enforces the voting window (open from 26 Oct 2026 00:00 to 12 Nov 23:59 SGT per Kelicia (close moved from 5 Nov in Revision 12), 26 Oct: "live anytime"; same as `event.config.ts`, unit-tested), one vote per email, and the admin passcode for the tally. The page shows no banner and follows the same window. Admin Open/Close is disabled: the window opens and closes by itself.
 
 **Admin passcode:** only its SHA-256 is in Code.gs (`ADMIN_KEY_SHA256`); the passcode itself is in `developer/outbox/imc4-voting-site-ADMIN-PASSCODE.txt` (gitignored) and never in the page. `#/admin` sends it to Code.gs, which answers the tally only to the right passcode.
 
@@ -861,7 +867,7 @@ Without both, `/api/vote` answers `misconfigured` and the page shows "The voting
 2. **Key visual edge to edge.** It sits outside the padded column, with no side or top gap and no rounded corners, up to 1920px wide. On desktop this makes it much taller than before (427px at 1280). Option B, a re-cut with a bigger title lockup, needs design.
 3. **Brand line removed** from the voting page. The key visual carries the title. The admin view keeps it.
 4. **Green dot** on "Voting open". Grey before voting opens, red once closed.
-5. **Headline kept, her line under it:** the H1 stays "Who makes the Top 10?" (Kelicia, 13 Oct: keep it). Under it: "Vote your favourite lookalike now! Voting closes Thu 12 Nov, 11:59pm SGT." (date from `votingWindow`).
+5. **Headline, her line under it:** the H1 is "Who makes the final 3?" since Revision 13 (from `event.advancing`; was "Who makes the Top 10?", kept by Kelicia on 13 Oct). Under it: "Vote your favourite lookalike now! Voting closes Thu 12 Nov, 11:59pm SGT." (date from `votingWindow`).
 6. **Rule line:** "One vote per person. It cannot be changed once you confirm." It also appears in the confirm sheet.
 7. **Promo pop-up after a vote** (`PromoPopup` in `src/ui/PromoBanner.tsx`). It holds the creative and a Close button, and links to `promoBanner.href` once that is set. Before a vote the promo is not on the page. Once voted, or when voting is not open, it also sits at the bottom.
 8. **Revision 11 (5 Nov 2026): "Your vote is in" panel replaces the image-only pop-up.** Same mechanics (opens once the vote is counted, Back or backdrop closes it). It shows the heading ("Your vote for #7 Name is in"), the 100 Flights creative, four short lines, a "Join the 100 Flights promo" button to `promoBanner.href` (new tab) and Close. All wording lives in `promoDetails` in `event.config.ts`. At 360 x 640 it fits without scrolling; shorter screens scroll inside the panel.
@@ -967,7 +973,7 @@ npm run test:e2e     # 113 steps in headless Chrome, about 2-3 minutes
 | `local-store` | The demo adapter: email voters, sample addresses, pretend clock, the browser marker |
 | `api-store` | The production adapter's requests (email in the body, not the URL), error mapping and response validation |
 | `csv-time-retry` | CSV escaping and formula neutralising, Singapore time, retry with backoff |
-| `config` | `event.config.ts` itself: 20 contestants, defaults, copy guardrails, the removed paragraphs stay removed |
+| `config` | `event.config.ts` itself: 10 contestants, defaults, copy guardrails, the removed paragraphs stay removed |
 
 The end-to-end test also screenshots every voter state and the admin view at
 360, 390, 430 and 1280px, three times over:

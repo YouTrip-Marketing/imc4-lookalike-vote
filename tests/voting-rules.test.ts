@@ -168,11 +168,11 @@ describe('standings: who is through on votes alone', () => {
     expect([...result.values()]).toEqual(['advancing', 'advancing']);
   });
 
-  it('works for the real shape: 20 contestants, 10 places', () => {
-    const votes = [50, 48, 45, 40, 38, 30, 29, 25, 22, 20, 20, 12, 9, 7, 5, 4, 3, 2, 1, 0];
-    const result = [...standings(tallies(votes), 10).values()];
-    expect(result.filter((standing) => standing === 'advancing')).toHaveLength(9);
+  it('works for the real shape (Revision 13): 10 contestants, 3 places', () => {
+    const votes = [50, 48, 45, 45, 38, 30, 29, 25, 22, 0];
+    const result = [...standings(tallies(votes), 3).values()];
+    expect(result.filter((standing) => standing === 'advancing')).toHaveLength(2);
     expect(result.filter((standing) => standing === 'tied_at_cut')).toHaveLength(2);
-    expect(result.filter((standing) => standing === 'out')).toHaveLength(9);
+    expect(result.filter((standing) => standing === 'out')).toHaveLength(6);
   });
 });

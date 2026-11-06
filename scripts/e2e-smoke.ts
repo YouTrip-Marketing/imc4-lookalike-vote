@@ -109,7 +109,7 @@ const CHROME_CANDIDATES = [
 
 const DUPLICATE = 'A vote has already been counted for this email.';
 // Revision 10: Kelicia's wording, verbatim.
-const OPEN_H1 = `Who makes the Top ${event.advancing}?`;
+const OPEN_H1 = `Who makes the final ${event.advancing}?`;
 const OPEN_LEDE = 'Vote your favourite lookalike now! Voting closes Thu 12 Nov, 11:59pm SGT.';
 const RULE_LINE = 'One vote per person. It cannot be changed once you confirm.';
 // Revision 12: the winner line replaces "Top 10 will be announced ...".
@@ -669,10 +669,10 @@ async function partC(
 
   await step('sheet build: the same email from another phone is refused, and logged as Duplicate? TRUE', async () => {
     const other = await open(await browser.createBrowserContext(), `${site}/`);
-    await voteFor(other, 12, '  test+1@example.com');
+    await voteFor(other, 9, '  test+1@example.com');
     await see(other, DUPLICATE);
     assert.equal(rows().length, 2);
-    assert.deepEqual([rows()[1]?.[4], rows()[1]?.[8]], [12, true]);
+    assert.deepEqual([rows()[1]?.[4], rows()[1]?.[8]], [9, true]);
     await other.close();
   });
 
@@ -793,7 +793,7 @@ async function partD(
   const context = await browser.createBrowserContext();
   const voter = await open(context, `${openSite}${PAGES_BASE}`);
 
-  await step('runtime Top 20 dry run: names, handles and 20 photos from the Contestants tab, with the photo treatment', async () => {
+  await step('runtime Top 10 dry run: names, handles and 10 photos from the Contestants tab, with the photo treatment', async () => {
     await see(voter, 'Dry Run 07');
     const cards = await voter.$$eval('.grid > li', (items) =>
       items.map((item) => ({
@@ -801,7 +801,7 @@ async function partD(
         label: item.querySelector('.card__label')?.textContent ?? '',
       })),
     );
-    assert.equal(cards.length, 20);
+    assert.equal(cards.length, 10);
     assert.deepEqual(cards[6], { name: 'Dry Run 07', label: 'No. 07 · Town · @dryrun_07' });
     await voter.evaluate(async () => {
       for (const img of document.querySelectorAll<HTMLImageElement>('.grid .art--photo')) {
@@ -812,7 +812,7 @@ async function partD(
     await voter.waitForFunction(
       () => {
         const photos = [...document.querySelectorAll<HTMLImageElement>('.grid .art--photo')];
-        return photos.length === 20 && photos.every((img) => img.complete && img.naturalWidth > 0);
+        return photos.length === 10 && photos.every((img) => img.complete && img.naturalWidth > 0);
       },
       { timeout: 20_000 },
     );
@@ -868,7 +868,7 @@ async function partA(browser: Browser, site: string): Promise<void> {
   await step('the link from Instagram lands straight on the voting page, inside the window', async () => {
     await see(voter, OPEN_H1);
     await see(voter, 'DEMO DATA');
-    assert.equal((await voter.$$('.grid > li')).length, 20);
+    assert.equal((await voter.$$('.grid > li')).length, 10);
     assert.equal(await cardsDisabled(voter), false);
     await see(voter, `Voting closes ${formatSgtDateTime(votingWindow.closesAt)}.`);
     await shot(voter, 'demo-01-vote-open');
@@ -894,13 +894,13 @@ async function partA(browser: Browser, site: string): Promise<void> {
       assert.ok(pill.bottom <= heading, 'a status pill overlaps the heading');
     }
     assert.equal(await voter.$eval('.voter__intro h1', (node) => node.textContent), OPEN_H1);
-    assert.equal(OPEN_H1, 'Who makes the Top 10?');
+    assert.equal(OPEN_H1, 'Who makes the final 3?');
     assert.equal(await voter.$eval('.voter__lede', (node) => node.textContent), OPEN_LEDE);
     assert.equal(OPEN_LEDE, `Vote your favourite lookalike now! Voting closes ${formatSgtDateTime(votingWindow.closesAt)}.`);
     assert.equal(await voter.$eval('.voter__rule', (node) => node.textContent), RULE_LINE);
   });
 
-  await step('all 20 contestants are numbered 1 to 20 and use generated placeholders, not photos', async () => {
+  await step('all 10 contestants are numbered 1 to 10 and use generated placeholders, not photos', async () => {
     const labels = await voter.$$eval('.card__label', (nodes) => nodes.map((n) => n.textContent));
     assert.deepEqual(labels, contestants.map((c) => `No. ${String(c.number).padStart(2, '0')}`));
     // The giant outlined numeral is decoration: hidden from screen readers.
@@ -916,7 +916,7 @@ async function partA(browser: Browser, site: string): Promise<void> {
     );
     assert.equal(names[6], 'Contestant 7 No. 07');
     assert.equal((await voter.$$('.grid img')).length, 0);
-    assert.equal((await voter.$$('.grid svg.art--placeholder')).length, 20);
+    assert.equal((await voter.$$('.grid svg.art--placeholder')).length, 10);
   });
 
   await step('public counts are hidden by default', async () => {
@@ -1053,7 +1053,7 @@ async function partA(browser: Browser, site: string): Promise<void> {
       const grid = document.querySelector('.grid')?.getBoundingClientRect();
       return grid !== undefined && grid.top >= 0 && grid.top < 120;
     }, { timeout: 5_000 });
-    assert.equal((await voter.$$('.grid > li')).length, 20);
+    assert.equal((await voter.$$('.grid > li')).length, 10);
     assert.equal(await cardsDisabled(voter), true);
     await shot(voter, 'demo-04b-see-all-contestants');
     await voter.evaluate(() => window.scrollTo(0, 0));
@@ -1170,7 +1170,7 @@ async function partA(browser: Browser, site: string): Promise<void> {
       '1 (tie) #7 Contestant 7 1',
       '3 #1 Contestant 1 0',
     ]);
-    await see(admin, 'Only 2 of 20 contestants have a vote so far');
+    await see(admin, 'Only 2 of 10 contestants have a vote so far');
     // textContent, not innerText: the labels are upper-cased by CSS.
     const facts = await admin.$eval('.facts', (node) => node.textContent ?? '');
     assert.ok(facts.includes('Votes per email1'), facts);
@@ -1226,9 +1226,9 @@ async function partA(browser: Browser, site: string): Promise<void> {
     const tally = (await lastDownload(admin, 1)).trim().split('\r\n');
     assert.equal(
       tally[0],
-      'rank,tied,in_top_10_on_votes,contestant_number,contestant_id,stage_name,votes',
+      `rank,tied,in_top_${event.advancing}_on_votes,contestant_number,contestant_id,stage_name,votes`,
     );
-    assert.equal(tally.length, 21, 'one row per contestant');
+    assert.equal(tally.length, contestants.length + 1, 'one row per contestant');
     const sum = tally.slice(1).reduce((total, line) => total + Number(line.split(',').at(-1)), 0);
     assert.equal(sum, 77);
 
@@ -1318,9 +1318,9 @@ async function partA(browser: Browser, site: string): Promise<void> {
     await pickCard(page, 7);
     await press(page, 'Confirm vote', 'dialog.sheet');
     await press(page, 'New visitor, same wifi');
-    await voteFor(page, 12, '=1+2@example.com');
+    await voteFor(page, 9, '=1+2@example.com');
     await press(page, 'New visitor, same email');
-    await voteFor(page, 12, 'JANEDOE@gmail.com');
+    await voteFor(page, 9, 'JANEDOE@gmail.com');
     await see(page, DUPLICATE);
 
     await page.evaluate(() => {
@@ -1883,7 +1883,7 @@ async function partB(
     });
     assert.equal((other as { ok: boolean }).ok, true);
 
-    await voteFor(colleague, 12, `  ${EMAIL.colleague.toUpperCase()} `);
+    await voteFor(colleague, 8, `  ${EMAIL.colleague.toUpperCase()} `);
     await see(colleague, DUPLICATE);
     assert.equal((await text(colleague)).includes('Vote in!'), false);
     assert.equal(await colleague.$('.card--chosen'), null);
@@ -1947,7 +1947,7 @@ async function partB(
     await see(train, OPEN_H1);
 
     await api.pause();
-    await voteFor(train, 14, EMAIL.train);
+    await voteFor(train, 6, EMAIL.train);
     await see(train, 'Connection is slow. Trying again');
     await shot(train, 'prod-04-vote-retrying');
     await see(train, "Not sent: we couldn't reach the voting server.", 30_000);
@@ -1958,7 +1958,7 @@ async function partB(
 
     await api.resume();
     await press(train, 'Try sending again');
-    await see(train, 'You voted for #14 Contestant 14.', 30_000);
+    await see(train, 'You voted for #6 Contestant 6.', 30_000);
     assert.equal(await voteCount(), 5, 'the retried vote is counted exactly once');
     await context.close();
   });
@@ -1983,8 +1983,8 @@ async function partB(
       { userAgent: INSTAGRAM_UA },
     );
     await see(page, OPEN_H1);
-    await voteFor(page, 20, EMAIL.instagram);
-    await see(page, 'You voted for #20 Contestant 20.');
+    await voteFor(page, 10, EMAIL.instagram);
+    await see(page, 'You voted for #10 Contestant 10.');
     assert.equal(await voteCount(), 6);
     await context.close();
   });
@@ -2019,14 +2019,14 @@ async function partB(
       delete Crypto.prototype.randomUUID;
     `;
     const page = await open(context, `${site}/`, { before: removeShowModal });
-    await pickCard(page, 11);
+    await pickCard(page, 7);
     assert.ok(await page.$('dialog.sheet.sheet--fallback[open]'), 'fallback sheet did not open');
     const box = await (await page.$('dialog.sheet'))?.boundingBox();
     assert.ok(box && box.y >= 0 && box.y + box.height <= PHONE.height + 1, 'sheet is off screen');
     await typeEmail(page, EMAIL.oldPhone);
     await shot(page, 'prod-07-sheet-fallback');
     await press(page, 'Confirm vote', 'dialog.sheet');
-    await see(page, 'You voted for #11 Contestant 11.');
+    await see(page, 'You voted for #7 Contestant 7.');
     assert.equal(await voteCount(), 8);
     await context.close();
   });

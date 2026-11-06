@@ -2,7 +2,7 @@
   "name": "imc4-lookalike-voting",
   "private": true,
   "version": "0.2.0",
-  "description": "Public online voting site for the IMC 4 lookalike contest, Top 20 to Top 10. First draft, local build only.",
+  "description": "Public online voting site for the IMC 4 lookalike contest, Top 10 round (Revision 13). Production on Cloudflare Pages and GitHub Pages.",
   "type": "module",
   "scripts": {
     "dev": "vite",

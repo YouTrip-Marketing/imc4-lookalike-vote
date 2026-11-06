@@ -1,7 +1,7 @@
 /**
  * Before the reveal: checks the Contestants tab exactly as the page will see it
  * at 2 Nov 12:00, using the admin passcode (the public answer is empty until
- * then). For each of the 20: is there a name, and does the photo address load
+ * then). For each contestant in event.config.ts (10 since Revision 13): is there a name, and does the photo address load
  * as an image? Prints numbers and OK/MISSING only.
  *
  *   npx tsx scripts/contestants-check.ts <path-to-ADMIN-PASSCODE.txt>
@@ -11,6 +11,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { loadEnv } from 'vite';
+import { contestants } from '../event.config';
 
 const root = resolve(import.meta.dirname, '..');
 const endpoint = loadEnv('production', root, '').VITE_SHEET_ENDPOINT ?? '';
@@ -27,7 +28,8 @@ const answer = (await (await fetch(`${endpoint}?view=contestants&key=${encodeURI
 if (!answer.ok || answer.data === undefined) throw new Error('The sheet did not answer. Is Code.gs deployed?');
 const byNo = new Map(answer.data.contestants.map((c) => [c.no, c]));
 let ready = 0;
-for (let no = 1; no <= 20; no += 1) {
+const count = contestants.length;
+for (let no = 1; no <= count; no += 1) {
   const c = byNo.get(no);
   let photo = 'MISSING';
   if (c !== undefined && c.photo !== '') {
@@ -43,4 +45,4 @@ for (let no = 1; no <= 20; no += 1) {
   if (name === 'OK' && photo === 'OK') ready += 1;
   console.log(`No. ${String(no).padStart(2, '0')}  name ${name}  photo ${photo}`);
 }
-console.log(`${ready}/20 ready. Public until reveal: ${answer.data.revealed ? 'ALREADY REVEALED' : 'hidden (correct)'}.`);
+console.log(`${ready}/${count} ready. Public until reveal: ${answer.data.revealed ? 'ALREADY REVEALED' : 'hidden (correct)'}.`);

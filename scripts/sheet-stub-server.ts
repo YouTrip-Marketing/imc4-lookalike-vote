@@ -18,9 +18,9 @@ import { loadAppsScript, type AppsScriptOptions, type AppsScriptRun } from './ap
 export const STUB_IP = '203.0.113.5';
 const PHOTO = readFileSync(resolve(import.meta.dirname, '..', 'public', 'promo', 'imc4-100-flights-korea-banner-1080x608.jpg'));
 
-/** A filled-in Contestants tab for the dry run: 20 names, handles, taglines, photo addresses on the stub. */
+/** A filled-in Contestants tab for the dry run: 10 names, handles, taglines, photo addresses on the stub. */
 export function dryRunContestants(port: number): (string | number)[][] {
-  return Array.from({ length: 20 }, (_, index) => {
+  return Array.from({ length: 10 }, (_, index) => {
     const n = String(index + 1).padStart(2, '0');
     return [index + 1, `Dry Run ${n}`, `dryrun_${n}`, 'Town', `http://127.0.0.1:${port}/photo/${n}.jpg`];
   });
@@ -48,7 +48,7 @@ export async function startSheetStubServer(port: number, options: AppsScriptOpti
       return;
     }
     if (/^\/photo\/\d\d\.jpg$/.test(url.pathname)) {
-      // Stands in for contestant photos on Google's image server: one real JPEG for all 20.
+      // Stands in for contestant photos on Google's image server: one real JPEG for all 10.
       photosServed += 1;
       response.writeHead(200, { 'Content-Type': 'image/jpeg', 'Cache-Control': 'no-store' }).end(PHOTO);
       return;

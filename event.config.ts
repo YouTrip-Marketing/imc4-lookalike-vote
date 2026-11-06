@@ -6,7 +6,7 @@
  *   promoBanner   - the campaign promo banner (in the post-vote panel; also at
  *                   the bottom once voted or not open)
  *   promoDetails  - the words in the post-vote "Your vote is in" panel
- *   contestants   - the 20 in the vote
+ *   contestants   - the 10 in the vote (Revision 13: the Top 10; was the Top 20)
  *   votingWindow  - when voting opens and closes (Singapore time)
  *   votingRules   - whether a vote can be changed, public counts
  *   burstRule     - when the admin view flags a run of votes
@@ -36,7 +36,9 @@ import type {
 } from './src/domain/types';
 
 export const event: EventInfo = {
-  id: 'imc4-top20-vote',
+  // Revision 13: new id for the Top 10 round, so every phone forgets its
+  // Top 20 "I voted" note (the id keys the browser's vote marker, nothing else).
+  id: 'imc4-top10-vote',
 
   // LEGAL GATE: naming the artist in public-facing assets is pending legal review.
   // This is the only place the event title is written. Change it here and every
@@ -44,7 +46,10 @@ export const event: EventInfo = {
   title: 'Jungkook Lookalike Contest',
 
   organiser: 'YouTrip',
-  advancing: 10,
+  // Revision 13 ASSUMPTION (Chief of Staff, 6 Nov 2026; Terry calls the next
+  // round "the final-3 vote"; Kelicia has not confirmed): the heading reads
+  // "Who makes the final 3?". Change this one number if the round differs.
+  advancing: 3,
 
   // Sat 7 Nov 2026: Top 10 reveal, set 2026-10-13 with the confirmed 2 to 5 Nov
   // voting window (was 5 Nov, the PR brief's date, which is now close day).
@@ -139,14 +144,15 @@ export const promoDetails: PromoDetails = {
 };
 
 /**
- * PLACEHOLDERS. Replace with the real Top 20 once names and photos are confirmed
+ * PLACEHOLDERS for the Top 10 (Revision 13: 10, was 20). The real names and
+ * photos come from the sheet's Contestants tab at runtime. Replace here once confirmed
  * and consented. `photo: null` renders a generated abstract tile.
  * Real photos go in /public/contestants/ and are referenced as 'contestants/01.jpg'.
  * `handle` is optional and is shown as plain text, e.g. handle: '@example'.
  * `tagline` is optional short text for the card's label line (e.g. a town).
  * Left empty here on purpose: nothing is invented for placeholders.
  */
-export const contestants: readonly Contestant[] = Array.from({ length: 20 }, (_, index) => {
+export const contestants: readonly Contestant[] = Array.from({ length: 10 }, (_, index) => {
   const number = index + 1;
   return {
     id: `c${String(number).padStart(2, '0')}`,

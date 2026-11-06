@@ -164,13 +164,13 @@ describe('Code.gs doGet', () => {
     const script = loadAppsScript({ now: () => new Date('2026-10-13T06:30:00Z'), adminKey: ADMIN });
     script.doPost(vote({ email: 'alice@example.com', voteId: 'vote-0001-aaaa' }));
     script.doPost(vote({ email: 'alice@example.com', voteId: 'vote-0009-dupe', contestantNumber: 5 }));
-    script.doPost(vote({ email: 'bob@example.com', voteId: 'vote-0002-bbbb', contestantNumber: 12 }));
+    script.doPost(vote({ email: 'bob@example.com', voteId: 'vote-0002-bbbb', contestantNumber: 9 }));
     const answer = script.doGet(ADMIN).json as { ok: boolean; data: { votes: Record<string, unknown>[] } };
     expect(answer.ok).toBe(true);
     expect(answer.data.votes.map(({ n, no, at }) => ({ n, no, at }))).toEqual([
       { n: 1, no: 7, at: '2026-10-13T06:30:00.000Z' },
       // n follows the sheet's rows, so the refused repeat in between leaves a gap.
-      { n: 3, no: 12, at: '2026-10-13T06:30:00.000Z' },
+      { n: 3, no: 9, at: '2026-10-13T06:30:00.000Z' },
     ]);
     for (const row of answer.data.votes) expect(row.ref).toMatch(/^[0-9a-f]{8}$/);
     expect(answer.data.votes[0]?.ref).not.toBe(answer.data.votes[1]?.ref);

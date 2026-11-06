@@ -290,7 +290,7 @@ export function VoteView({ store }: { store: VoteStore }): JSX.Element {
                 ? 'Voting opens soon'
                 : voted
                   ? 'Vote in!'
-                  : `Who makes the Top ${event.advancing}?`}
+                  : `Who makes the final ${event.advancing}?`}
         </h1>
         <p className="voter__lede">
           {sending && (
