@@ -158,10 +158,10 @@ describe('voter-facing copy', () => {
     expect(config).not.toMatch(/make sure each person/i);
   });
 
-  it('Revision 13d: carries Kelicia\'s heading and lede verbatim', () => {
+  it('Revision 13d heading and Revision 14 lede: Kelicia\'s words verbatim', () => {
     expect(event.openHeading).toBe('Who’s the ultimate JKook lookalike?');
     expect(event.openLede).toBe(
-      'We’re celebrating 100 Free Flights to Korea with a search for the ultimate JKook lookalike, and you get to decide who takes the crown! Cast your vote by 12 Nov and tune in to our Instagram livestream @youtripsg that day for the winner reveal.',
+      'We’re celebrating 100 free flights to Korea with a search for the ultimate JKook lookalike and you get to decide who takes the crown! Cast your vote and tune in to our Instagram (@youtripsg) livestream for the winner reveal on the 12 November.',
     );
   });
 

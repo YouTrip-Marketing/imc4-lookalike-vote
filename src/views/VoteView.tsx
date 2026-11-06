@@ -283,10 +283,9 @@ export function VoteView({ store }: { store: VoteStore }): JSX.Element {
     );
   }
 
-  // Revision 10: the promo pops up after a vote. Before a vote it is not on the
-  // page at all; once this browser has voted, or voting is not open, it also
-  // sits at the bottom, under the contestants.
-  const promoAtBottom = (voted || status !== 'open') && !sending;
+  // Revision 14 (Kelicia): the promo sits at the foot of the page in every state.
+  // Unchanged: the post-vote panel, and the copy under the lede once voted.
+  const promoAtBottom = !sending;
 
   const opens = formatSgtDateTime(session.state.opensAt);
   // Kelicia's wording, Revision 12 (replaces Revision 10's "Top 10 will be announced ...").
@@ -411,10 +410,7 @@ export function VoteView({ store }: { store: VoteStore }): JSX.Element {
                 {chosen && <span className="card__badge">Your vote</span>}
                 <span className="card__caption">
                   <span className="card__stage">{contestant.stageName}</span>
-                  {/* Revision 13b: the finalist's pitch, clipped to 3 lines (2 on phones) by CSS. */}
-                  {contestant.tagline !== undefined && contestant.tagline.trim() !== '' && (
-                    <span className="card__pitch">{contestant.tagline}</span>
-                  )}
+                  {/* Revision 14: no pitch on the card; the detail sheet shows it in full. */}
                   <span className="card__label">{labelLine(contestant)}</span>
                   {session.tallies !== null && (
                     <span className="card__count">

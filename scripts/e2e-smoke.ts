@@ -254,9 +254,14 @@ async function closePromoPopup(page: Page): Promise<void> {
   await page.waitForFunction(() => document.querySelector('dialog.sheet--promo[open]') === null, { timeout: 5_000 });
 }
 
-/** Before a vote, the promo is nowhere on the page (Revision 10). */
+/**
+ * Before a vote: the promo is at the foot of the page only (Revision 14; it was
+ * nowhere before a vote from Revision 10). No copy under the lede, no panel.
+ */
 async function noPromoYet(page: Page): Promise<void> {
-  assert.equal(await page.$('.promo-banner'), null, 'the promo banner shows before a vote');
+  assert.equal(await page.$('.promo-banner[data-placement="lede"]'), null, 'the promo sits under the lede before a vote');
+  assert.equal(await page.$('dialog.sheet--promo'), null, 'the promo panel is open before a vote');
+  assert.equal(await page.$$eval('main .promo-banner[data-placement="bottom"]', (n) => n.length), 1, 'no promo at the foot before a vote');
 }
 
 /**
@@ -828,39 +833,29 @@ async function partD(
     const cards = await voter.$$eval('.grid > li', (items) =>
       items.map((item) => ({
         name: item.querySelector('.card__stage')?.textContent ?? '',
-        pitch: item.querySelector('.card__pitch')?.textContent ?? '',
         label: item.querySelector('.card__label')?.textContent ?? '',
+        inside: (() => {
+          const card = item.getBoundingClientRect();
+          const caption = item.querySelector('.card__caption')?.getBoundingClientRect();
+          return caption !== undefined && caption.top >= card.top && caption.bottom <= card.bottom + 0.5;
+        })(),
       })),
     );
     assert.equal(cards.length, 10);
-    // Revision 13b: the pitch has its own line, in full (the CSS clips it); the label is number and handle.
-    assert.deepEqual(cards[6], { name: 'Dry Run 07', pitch: SHORT_PITCH, label: 'No. 07 · @dryrun_07' });
-    assert.deepEqual(cards[1], { name: 'Dry Run 02', pitch: LONG_PITCH, label: 'No. 02 · @dryrun_02' });
-    assert.deepEqual(cards[2], { name: 'Dry Run 03', pitch: SHORT_PITCH, label: 'No. 03' });
+    // Revision 14: no pitch on the cards at any width; the label is number and handle.
+    assert.equal(await voter.$$eval('.grid .card__pitch', (n) => n.length), 0, 'a pitch is on a card');
+    assert.deepEqual(cards[6], { name: 'Dry Run 07', label: 'No. 07 · @dryrun_07', inside: true });
+    assert.deepEqual(cards[2], { name: 'Dry Run 03', label: 'No. 03', inside: true });
+    assert.ok(cards.every((card) => card.inside), 'a caption runs outside its card');
+    // The detail sheet keeps the full pitch (Revision 13e), long and short.
     assert.equal(LONG_PITCH.length, 300);
     assert.equal(SHORT_PITCH.length, 28);
-    const pitchLayout = await voter.$$eval('.grid > li', (items) =>
-      items.map((item) => {
-        const pitch = item.querySelector<HTMLElement>('.card__pitch');
-        const card = item.getBoundingClientRect();
-        const caption = item.querySelector('.card__caption')?.getBoundingClientRect();
-        const lineHeight = pitch ? parseFloat(getComputedStyle(pitch).lineHeight) : 0;
-        return {
-          lines: pitch ? Math.round(pitch.getBoundingClientRect().height / lineHeight) : 0,
-          clipped: pitch ? pitch.scrollHeight > pitch.clientHeight + 1 : false,
-          inside: caption !== undefined && caption.top >= card.top && caption.bottom <= card.bottom + 0.5,
-        };
-      }),
-    );
-    const phoneWidth = await voter.evaluate(() => window.innerWidth < 600);
-    // Revision 13f: one line on phones (the detail sheet shows the full pitch), three wider.
-    const maxLines = phoneWidth ? 1 : 3;
-    for (const [index, layout] of pitchLayout.entries()) {
-      assert.ok(layout.lines >= 1 && layout.lines <= maxLines, `card ${index + 1}: pitch on ${layout.lines} lines, max ${maxLines}`);
-      assert.ok(layout.inside, `card ${index + 1}: caption runs outside the card`);
-    }
-    assert.equal(pitchLayout[1]?.clipped, true, 'the 300-character pitch should end in an ellipsis');
-    if (!phoneWidth) assert.equal(pitchLayout[0]?.clipped, false, 'the 28-character pitch should show in full');
+    assert.equal((await openDetail(voter, 2)).pitch, LONG_PITCH);
+    await press(voter, 'Close', 'dialog.sheet--detail');
+    await voter.waitForFunction(() => document.querySelector('dialog.sheet[open]') === null, { timeout: 5_000 });
+    assert.equal((await openDetail(voter, 7)).pitch, SHORT_PITCH);
+    await press(voter, 'Close', 'dialog.sheet--detail');
+    await voter.waitForFunction(() => document.querySelector('dialog.sheet[open]') === null, { timeout: 5_000 });
     await voter.evaluate(async () => {
       for (const img of document.querySelectorAll<HTMLImageElement>('.grid .art--photo')) {
         img.loading = 'eager';
@@ -950,8 +945,9 @@ async function partA(browser: Browser, site: string): Promise<void> {
     await shot(voter, 'demo-01-vote-open');
   });
 
-  await step('Rev 10: no promo before a vote; no brand line; green dot; her two lines, verbatim', async () => {
+  await step('Rev 14: before a vote the promo is at the foot only; no brand line; green dot; her two lines, verbatim', async () => {
     await noPromoYet(voter);
+    await checkPromo(voter, 'bottom');
     assert.equal(await voter.$('main .brand'), null, 'the brand line under the banner is back');
     assert.equal(/jung\s*kook|lookalike contest/i.test(await text(voter)), false, 'the page text names the contest/artist');
     const dot = await voter.$eval('.pill--open .pill__dot', (node) => getComputedStyle(node).backgroundColor);
@@ -972,7 +968,7 @@ async function partA(browser: Browser, site: string): Promise<void> {
     assert.equal(await voter.$eval('.voter__intro h1', (node) => node.textContent), OPEN_H1);
     assert.equal(OPEN_H1, 'Who’s the ultimate JKook lookalike?');
     assert.equal(await voter.$eval('.voter__lede', (node) => node.textContent), OPEN_LEDE);
-    assert.ok(OPEN_LEDE.startsWith('We\u2019re celebrating 100 Free Flights to Korea') && OPEN_LEDE.endsWith('for the winner reveal.'), OPEN_LEDE);
+    assert.ok(OPEN_LEDE.startsWith('We\u2019re celebrating 100 free flights to Korea') && OPEN_LEDE.endsWith('for the winner reveal on the 12 November.'), OPEN_LEDE);
     assert.equal(/final 3/i.test(await text(voter)), false, 'the public page still says "final 3"');
     assert.equal(await voter.$eval('.voter__rule', (node) => node.textContent), RULE_LINE);
   });

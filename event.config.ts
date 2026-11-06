@@ -72,11 +72,11 @@ export const event: EventInfo = {
   // "Ok to proceed with Jkook Lookalike as the overall name on marketing assets".
   legalReviewPending: false,
 
-  // Revision 13d (Kelicia, 6 Nov 2026), verbatim: what a visitor sees while
+  // Revision 13d heading, Revision 14 lede (Kelicia, 6 Nov 2026), verbatim: what a visitor sees while
   // voting is open and they have not voted. The rule line stays under it.
   openHeading: 'Who’s the ultimate JKook lookalike?',
   openLede:
-    'We’re celebrating 100 Free Flights to Korea with a search for the ultimate JKook lookalike, and you get to decide who takes the crown! Cast your vote by 12 Nov and tune in to our Instagram livestream @youtripsg that day for the winner reveal.',
+    'We’re celebrating 100 free flights to Korea with a search for the ultimate JKook lookalike and you get to decide who takes the crown! Cast your vote and tune in to our Instagram (@youtripsg) livestream for the winner reveal on the 12 November.',
 
   // COPY GUARDRAIL, revised 6 Nov 2026 (Revision 13d): the public vote DOES
   // decide the winner ("you get to decide who takes the crown"), so the page may
