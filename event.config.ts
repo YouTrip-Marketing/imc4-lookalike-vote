@@ -76,7 +76,7 @@ export const event: EventInfo = {
   // voting is open and they have not voted. The rule line stays under it.
   openHeading: 'Who’s the ultimate JKook lookalike?',
   openLede:
-    'We’re celebrating 100 Free Flights to Korea with a search for the ultimate JKook lookalike, and you get to decide who takes the crown! Cast your vote before 12 Nov and tune in to our Instagram livestream @youtripsg that day for the winner reveal.',
+    'We’re celebrating 100 Free Flights to Korea with a search for the ultimate JKook lookalike, and you get to decide who takes the crown! Cast your vote by 12 Nov and tune in to our Instagram livestream @youtripsg that day for the winner reveal.',
 
   // COPY GUARDRAIL, revised 6 Nov 2026 (Revision 13d): the public vote DOES
   // decide the winner ("you get to decide who takes the crown"), so the page may
@@ -183,6 +183,8 @@ export const contestants: readonly Contestant[] = Array.from({ length: 10 }, (_,
  */
 export const votingWindow: VotingWindow = {
   opensAt: '2026-10-26T00:00:00+08:00',
+  // Hard close, the backstop (Revision 12). On the night the real close is a
+  // manual call during the livestream.
   closesAt: '2026-11-12T23:59:00+08:00',
   autoOpen: true,
 };

@@ -99,7 +99,7 @@ describe('event.config.ts', () => {
     expect(sharedAddressRule.votes).toBeGreaterThanOrEqual(2);
   });
 
-  it('Revision 12: voting closes Thu 12 Nov 2026 23:59 SGT, and the winner line reads Thu 12 Nov 2026', () => {
+  it('Revision 12: voting closes Thu 12 Nov 2026 23:59 SGT (the hard close), and the winner line reads Thu 12 Nov 2026', () => {
     expect(votingWindow.closesAt).toBe('2026-11-12T23:59:00+08:00');
     expect(event.winnerAnnouncedOn).toBe('2026-11-12');
     expect(formatCalendarDateWithYear(event.winnerAnnouncedOn)).toBe('Thu 12 Nov 2026');
@@ -161,7 +161,7 @@ describe('voter-facing copy', () => {
   it('Revision 13d: carries Kelicia\'s heading and lede verbatim', () => {
     expect(event.openHeading).toBe('Who’s the ultimate JKook lookalike?');
     expect(event.openLede).toBe(
-      'We’re celebrating 100 Free Flights to Korea with a search for the ultimate JKook lookalike, and you get to decide who takes the crown! Cast your vote before 12 Nov and tune in to our Instagram livestream @youtripsg that day for the winner reveal.',
+      'We’re celebrating 100 Free Flights to Korea with a search for the ultimate JKook lookalike, and you get to decide who takes the crown! Cast your vote by 12 Nov and tune in to our Instagram livestream @youtripsg that day for the winner reveal.',
     );
   });
 
