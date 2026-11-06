@@ -772,13 +772,19 @@ a.promo-banner:focus-visible {
   content: none;
 }
 
-/* Solid enough behind the name that a white photo still leaves it readable. */
+/*
+ * Revision 13f (6 Nov 2026): the fade starts below the chin on the finalists'
+ * head-and-shoulders crops, the lower 38% of the card (was 62%). Where a long
+ * caption reaches higher than that, .card__caption::before (below) carries the
+ * dark band up behind the text only, so the name, pitch and label never sit on
+ * the bare yellow background.
+ */
 .card__face::after {
   content: '';
   position: absolute;
   inset: 0;
   z-index: 2;
-  background: linear-gradient(0deg, rgba(var(--stage-rgb), 0.96) 0%, rgba(var(--stage-rgb), 0.88) 24%, rgba(var(--stage-rgb), 0) 62%);
+  background: linear-gradient(0deg, rgba(var(--stage-rgb), 0.96) 0%, rgba(var(--stage-rgb), 0.86) 20%, rgba(var(--stage-rgb), 0) 38%);
   pointer-events: none;
 }
 
@@ -836,6 +842,16 @@ a.promo-banner:focus-visible {
   z-index: 4;
   display: grid;
   gap: 5px;
+}
+
+/* Revision 13f: a scrim that is exactly as tall as the caption, plus a short fade above it. */
+.card__caption::before {
+  content: '';
+  position: absolute;
+  inset: -22px -10px -10px;
+  z-index: -1;
+  background: linear-gradient(0deg, rgba(var(--stage-rgb), 0.9) 0%, rgba(var(--stage-rgb), 0.82) calc(100% - 22px), rgba(var(--stage-rgb), 0) 100%);
+  pointer-events: none;
 }
 
 .card__stage {
