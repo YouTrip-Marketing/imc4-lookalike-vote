@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, type ReactNode } from 'react';
 import { event } from '../../event.config';
 import { formatSgtDayMonth } from '../domain/time';
 import type { VotingStatus } from '../domain/types';
@@ -85,6 +85,42 @@ export function Message({ tone = 'neutral', title, children, action }: MessagePr
       {action !== undefined && <div className="message__action">{action}</div>}
     </section>
   );
+}
+
+/**
+ * A sheet that the phone's Back gesture closes (Revision 10 promo panel; shared
+ * since Revision 13e with the contestant detail sheet). Opening it adds a
+ * browser history entry; Back fires popstate, which closes it, so the visitor
+ * stays on the voting page instead of leaving the site. The returned function
+ * closes it from a button or the backdrop and takes back the entry it added.
+ */
+export function useBackClosesSheet(open: boolean, onClose: () => void, flag: string): () => void {
+  // Escape fires the dialog's cancel AND close events, so close() can be called
+  // twice for one close. Without this, the second history.back() would take
+  // the visitor off the page (found 6 Nov 2026; affected the promo panel too).
+  const steppingBack = useRef(false);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    steppingBack.current = false;
+    window.history.pushState({ [flag]: true }, '');
+    const onBack = (): void => {
+      steppingBack.current = false;
+      onClose();
+    };
+    window.addEventListener('popstate', onBack);
+    return () => window.removeEventListener('popstate', onBack);
+  }, [open, onClose, flag]);
+
+  return useCallback(() => {
+    if (steppingBack.current) return;
+    if ((window.history.state as Record<string, unknown> | null)?.[flag] === true) {
+      steppingBack.current = true;
+      window.history.back();
+    } else {
+      onClose();
+    }
+  }, [onClose, flag]);
 }
 
 interface SheetProps {

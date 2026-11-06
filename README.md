@@ -462,7 +462,7 @@ The page reads names, Instagram handles, taglines and photos from the **Contesta
 | No. | 1 to 10 (Revision 13; was 1 to 20). The order of the Instagram posts. Do not change. |
 | Name | The contestant's stage name (up to 40 characters). Blank = "Contestant N" stays. |
 | Instagram handle | Optional. `@name` or `name`. Anything that is not a handle is dropped. |
-| Tagline | The finalist's one-line pitch (Revision 13b), up to 320 characters. Shown on its own line under the name, 3 lines at most (2 on phones), then "…". Optional. |
+| Tagline | The finalist's one-line pitch (Revision 13b), up to 320 characters. Shown on its own line under the name, 3 lines at most (1 on phones since Revision 13f), then "…"; shown in full on the detail sheet (Revision 13e). Optional. |
 | Photo | A Google Drive share link to the photo. The file must be shared **"Anyone with the link"**. A plain https image address also works. |
 
 How photos are served: a Drive link becomes `https://lh3.googleusercontent.com/d/<file id>=w960`, Google's image server, resized to 960px wide, so phone-size originals do not slow the page. The page shows it as supplied, full colour (Revision 13c), with a dark fade behind the caption. A photo that fails to load leaves the abstract tile; the name still shows.
@@ -875,6 +875,8 @@ Without both, `/api/vote` answers `misconfigured` and the page shows "The voting
 8. **Revision 11 (5 Nov 2026): "Your vote is in" panel replaces the image-only pop-up.** Same mechanics (opens once the vote is counted, Back or backdrop closes it). It shows the heading ("Your vote for #7 Name is in"), the 100 Flights creative, four short lines, a "Join the 100 Flights promo" button to `promoBanner.href` (new tab) and Close. All wording lives in `promoDetails` in `event.config.ts`. At 360 x 640 it fits without scrolling; shorter screens scroll inside the panel.
 9. **Announcement line (Revision 12):** "The winner will be announced on Thu 12 Nov 2026." (from `event.winnerAnnouncedOn`). Replaces "Top 10 will be announced Saturday, 7 Nov."
 10. **Revision 12: promo under the lede.** Once this browser has voted (voting open or closed), the 100 Flights banner sits straight under the "You voted for" line, before See all contestants (`placement="lede"`, eager). The bottom copy stays.
+11. **Revision 13e (6 Nov 2026): contestant detail sheet.** Tapping a card opens a sheet (`src/ui/ContestantDetail.tsx`) with the photo, name, "No. 07 · @handle", the full pitch, then **Vote** and Close. Vote opens the email and confirm sheet; its Back returns to the detail sheet, Close returns to the grid. Once this browser has voted, or voting is not open, the sheet still opens, without Vote. Which sheet shows is a small reducer (`src/domain/sheets.ts`, unit-tested). The phone's Back gesture and Escape close it (`useBackClosesSheet` in `src/ui/common.tsx`, shared with the promo panel; Escape used to step back twice and leave the site, fixed the same day). Cards carry `data-can-vote` instead of being disabled.
+12. **Revision 13f (6 Nov 2026): caption fade.** The card's fade covers the lower 38% (was 62%), starting below the chin on the finalists' crops; a scrim exactly as tall as the caption (`.card__caption::before`) keeps the text off the yellow. Phones show one line of pitch and tighter label tracking.
 
 ## Test votes into a Google Sheet (2026-10-13; production since 26 Oct, see Launch)
 

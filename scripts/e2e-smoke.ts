@@ -259,12 +259,37 @@ async function noPromoYet(page: Page): Promise<void> {
   assert.equal(await page.$('.promo-banner'), null, 'the promo banner shows before a vote');
 }
 
-async function pickCard(page: Page, contestantNumber: number): Promise<void> {
+/**
+ * Revision 13e: a tap opens the contestant detail sheet. Reports what it shows:
+ * the heading, the label, the pitch and its buttons.
+ */
+async function openDetail(
+  page: Page,
+  contestantNumber: number,
+): Promise<{ heading: string; label: string; pitch: string; buttons: string[]; labelledByHeading: boolean }> {
   await closePromoPopup(page);
   await page.bringToFront();
   await page.waitForSelector(`.grid > li:nth-child(${contestantNumber}) .card__face:not(:disabled)`);
   await page.click(`.grid > li:nth-child(${contestantNumber}) .card__face`);
-  await page.waitForSelector('dialog.sheet[open]');
+  await page.waitForSelector('dialog.sheet--detail[open]');
+  return page.$eval('dialog.sheet--detail[open]', (dialog) => {
+    const heading = dialog.querySelector('h2');
+    return {
+      heading: (heading?.textContent ?? '').trim(),
+      label: (dialog.querySelector('.detail__label')?.textContent ?? '').trim(),
+      pitch: (dialog.querySelector('.detail__pitch')?.textContent ?? '').trim(),
+      buttons: [...dialog.querySelectorAll('button')].map((b) => (b.textContent ?? '').trim()),
+      labelledByHeading: heading !== null && dialog.getAttribute('aria-labelledby') === heading.id,
+    };
+  });
+}
+
+/** Tap a card, then VOTE on its detail sheet: the email-and-confirm sheet opens (Revision 13e). */
+async function pickCard(page: Page, contestantNumber: number): Promise<void> {
+  const detail = await openDetail(page, contestantNumber);
+  assert.ok(detail.buttons.includes('Vote'), `no VOTE on the detail sheet for #${contestantNumber}: ${detail.buttons.join(', ')}`);
+  await press(page, 'Vote', 'dialog.sheet--detail');
+  await page.waitForSelector('dialog.sheet[open] #confirm-title');
 }
 
 /** Replaces whatever is in the email field with `email`, by keyboard, as a person would. */
@@ -331,9 +356,13 @@ async function smallTargets(page: Page, scope = 'body'): Promise<string[]> {
   }, scope);
 }
 
+/**
+ * True when no card leads to a vote. Since Revision 13e the cards stay tappable
+ * (the detail sheet shows the pitch) and carry data-can-vote instead.
+ */
 const cardsDisabled = (page: Page): Promise<boolean> =>
   page.$$eval('.card__face', (buttons) =>
-    buttons.every((button) => (button as HTMLButtonElement).disabled),
+    buttons.every((button) => (button as HTMLElement).dataset.canVote === 'false'),
   );
 
 async function unlockAdmin(page: Page, passcode: string): Promise<void> {
@@ -824,13 +853,14 @@ async function partD(
       }),
     );
     const phoneWidth = await voter.evaluate(() => window.innerWidth < 600);
-    const maxLines = phoneWidth ? 2 : 3;
+    // Revision 13f: one line on phones (the detail sheet shows the full pitch), three wider.
+    const maxLines = phoneWidth ? 1 : 3;
     for (const [index, layout] of pitchLayout.entries()) {
       assert.ok(layout.lines >= 1 && layout.lines <= maxLines, `card ${index + 1}: pitch on ${layout.lines} lines, max ${maxLines}`);
       assert.ok(layout.inside, `card ${index + 1}: caption runs outside the card`);
     }
     assert.equal(pitchLayout[1]?.clipped, true, 'the 300-character pitch should end in an ellipsis');
-    assert.equal(pitchLayout[0]?.clipped, false, 'the 28-character pitch should show in full');
+    if (!phoneWidth) assert.equal(pitchLayout[0]?.clipped, false, 'the 28-character pitch should show in full');
     await voter.evaluate(async () => {
       for (const img of document.querySelectorAll<HTMLImageElement>('.grid .art--photo')) {
         img.loading = 'eager';
@@ -1105,14 +1135,52 @@ async function partA(browser: Browser, site: string): Promise<void> {
     await voter.evaluate(() => window.scrollTo(0, 0));
   });
 
-  await step('backing out of the confirm sheet casts nothing', async () => {
+  await step('Rev 13e: card > detail > VOTE > confirm > Back to detail > Close to the grid; phone Back closes the detail; nothing cast', async () => {
     const other = await browser.createBrowserContext();
     const page = await open(other, `${site}/`);
-    await pickCard(page, 2);
+    const detail = await openDetail(page, 2);
+    assert.deepEqual(
+      { heading: detail.heading, label: detail.label, buttons: detail.buttons, labelledByHeading: detail.labelledByHeading },
+      { heading: 'Contestant 2', label: 'No. 02', buttons: ['Vote', 'Close'], labelledByHeading: true },
+    );
+    assert.equal(await page.$$eval('dialog.sheet[open]', (d) => d.length), 1, 'more than one sheet open');
+    await press(page, 'Vote', 'dialog.sheet--detail');
+    await page.waitForSelector('dialog.sheet[open] #confirm-title');
+    await see(page, 'Vote for #2 Contestant 2?');
+    assert.equal(await page.$('dialog.sheet--detail'), null, 'the detail sheet stayed up behind confirm');
     await press(page, 'Back', 'dialog.sheet');
+    await page.waitForSelector('dialog.sheet--detail[open]');
+    assert.equal(await page.$('#confirm-title'), null, 'confirm still open after Back');
+    await shot(page, 'demo-03c-detail-sheet');
+    await press(page, 'Close', 'dialog.sheet--detail');
+    await page.waitForFunction(() => document.querySelector('dialog.sheet[open]') === null, { timeout: 5_000 });
+    // Focus goes back to the card that opened it.
+    assert.equal(await page.evaluate(() => document.activeElement?.closest('.grid > li') !== null), true, 'focus did not return to the card');
+    // The phone's Back gesture closes the detail sheet and stays on the page.
+    const before = page.url();
+    await openDetail(page, 4);
+    await page.goBack();
+    await page.waitForFunction(() => document.querySelector('dialog.sheet--detail[open]') === null, { timeout: 5_000 });
+    assert.equal(page.url(), before, 'Back left the voting page');
+    // Escape fires cancel and close: it must step back once, not leave the site (fixed 6 Nov 2026).
+    const historyBefore = await page.evaluate(() => window.history.length);
+    await openDetail(page, 6);
+    await page.keyboard.press('Escape');
+    await page.waitForFunction(() => document.querySelector('dialog.sheet--detail[open]') === null, { timeout: 5_000 });
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    assert.equal(page.url(), before, 'Escape left the voting page');
     await see(page, OPEN_H1);
+    assert.ok((await page.evaluate(() => window.history.length)) >= historyBefore);
     assert.equal(await page.$('.card--chosen'), null);
     await other.close();
+  });
+
+  await step('Rev 13e: after voting, a card still opens its detail sheet, with no VOTE', async () => {
+    const detail = await openDetail(voter, 3);
+    assert.deepEqual(detail.buttons, ['Close']);
+    assert.equal(detail.heading, 'Contestant 3');
+    await press(voter, 'Close', 'dialog.sheet--detail');
+    await voter.waitForFunction(() => document.querySelector('dialog.sheet[open]') === null, { timeout: 5_000 });
   });
 
   await step('the voted state survives a reload, and the email is not kept in the browser', async () => {
@@ -1164,6 +1232,10 @@ async function partA(browser: Browser, site: string): Promise<void> {
     assert.equal(await voter.$('.pill--closes'), null, 'the closes pill shows after voting closed');
     await see(voter, WINNER_LINE);
     assert.ok(WINNER_LINE === 'The winner will be announced on Thu 12 Nov 2026.', WINNER_LINE);
+    // Rev 13e: closed, the detail sheet still opens for reading, without VOTE.
+    assert.deepEqual((await openDetail(voter, 5)).buttons, ['Close']);
+    await press(voter, 'Close', 'dialog.sheet--detail');
+    await voter.waitForFunction(() => document.querySelector('dialog.sheet[open]') === null, { timeout: 5_000 });
     assert.equal((await text(voter)).includes('Top 10 will be announced'), false, 'the old Top 10 line is still on the page');
     // This browser's vote was just forgotten ("New visitor, same email"): no promo under the lede.
     assert.equal(await voter.$('.promo-banner[data-placement="lede"]'), null, 'promo under the lede without a vote');

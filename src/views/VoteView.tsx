@@ -3,6 +3,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useReducer,
   useRef,
   useState,
   type FormEvent,
@@ -14,6 +15,7 @@ import { DemoVoterPanel } from '../demo/lazy';
 import { checkEmail, type EmailProblem } from '../domain/email';
 import { toVoteError, type VoteError } from '../domain/errors';
 import { newRequestId } from '../domain/requestId';
+import { initialSheets, sheetsReducer, visibleSheet } from '../domain/sheets';
 import { formatCalendarDateWithYear, formatSgtDateTime } from '../domain/time';
 import type { Contestant, PublicSession, VotingStatus } from '../domain/types';
 import { usePolling } from '../hooks/usePolling';
@@ -27,6 +29,7 @@ import {
 } from '../storage/voteMarker';
 import { hasDemoControls, type VoteStore } from '../storage';
 import { ContestantArt } from '../ui/ContestantArt';
+import { ContestantDetail } from '../ui/ContestantDetail';
 import { ClosesPill, Message, Sheet, Spinner, StatusPill } from '../ui/common';
 import { KeyVisualBanner } from '../ui/KeyVisual';
 import { PromoBannerSlot, PromoPopup } from '../ui/PromoBanner';
@@ -77,7 +80,20 @@ export function VoteView({ store }: { store: VoteStore }): JSX.Element {
   const storage = useMemo(() => browserStorage(), []);
   const [marker, setMarker] = useState<VoteMarker | null>(() => readVoteMarker(storage, event.id));
   const [cast, setCast] = useState<CastState>({ phase: 'idle' });
-  const [picked, setPicked] = useState<Contestant | null>(null);
+  // Revision 13e: the detail sheet (tap a card) and the email-and-confirm sheet (VOTE).
+  const [sheets, dispatchSheets] = useReducer(sheetsReducer<Contestant>, undefined, initialSheets<Contestant>);
+  const showing = visibleSheet(sheets);
+  const picked = showing === 'confirm' ? sheets.confirm : null;
+  const backFromConfirm = useCallback(() => dispatchSheets({ type: 'backFromConfirm' }), []);
+  const closeDetail = useCallback(() => dispatchSheets({ type: 'closeDetail' }), []);
+  // The card that opened the detail sheet: focus goes back to it when the sheet
+  // closes to the grid (the sheet leaves the page, so the dialog cannot do it).
+  const openedFrom = useRef<HTMLButtonElement | null>(null);
+  const previousSheet = useRef(showing);
+  useEffect(() => {
+    if (previousSheet.current === 'detail' && showing === null) openedFrom.current?.focus({ preventScroll: true });
+    previousSheet.current = showing;
+  }, [showing]);
   // Held for this page visit only, so a mistyped address can be fixed. Never
   // written to browser storage, and cleared once a vote is counted.
   const [email, setEmail] = useState('');
@@ -119,7 +135,8 @@ export function VoteView({ store }: { store: VoteStore }): JSX.Element {
   // A refusal from while voting was open no longer applies once it has closed.
   useEffect(() => {
     if (status !== 'open') {
-      setPicked(null);
+      // Back to the detail sheet if one was open: it stays readable, without VOTE.
+      dispatchSheets({ type: 'backFromConfirm' });
       setCast((current) => (current.phase === 'failed' ? { phase: 'idle' } : current));
     }
   }, [status]);
@@ -138,14 +155,15 @@ export function VoteView({ store }: { store: VoteStore }): JSX.Element {
     }
   }, [cast.phase]);
 
-  const openSheet = (contestant: Contestant): void => {
+  // VOTE on the detail sheet: on to the email and confirm step.
+  const voteFromDetail = useCallback(() => {
     setEmailError(null);
-    setPicked(contestant);
-  };
+    dispatchSheets({ type: 'vote' });
+  }, []);
 
   const submit = useCallback(
     async (contestant: Contestant, address: string, requestId: string): Promise<void> => {
-      setPicked(null);
+      dispatchSheets({ type: 'sent' });
       setCast({ phase: 'sending', attempt: 1, contestant, email: address });
       try {
         // Every retry carries the same request id, so a vote whose reply got lost
@@ -172,7 +190,7 @@ export function VoteView({ store }: { store: VoteStore }): JSX.Element {
           // Put the voter back where they can fix it.
           setCast({ phase: 'idle' });
           setEmailError(EMAIL_PROBLEM.malformed);
-          setPicked(contestant);
+          dispatchSheets({ type: 'reopenConfirm', contestant });
           return;
         }
         setCast({ phase: 'failed', error, contestant, email: address, requestId });
@@ -370,9 +388,15 @@ export function VoteView({ store }: { store: VoteStore }): JSX.Element {
               <button
                 type="button"
                 className="card__face"
-                disabled={!canVote}
+                // Revision 13e: always opens the detail sheet, so every pitch can be read;
+                // it offers VOTE only while this browser can vote. Disabled only while sending.
+                disabled={sending}
+                data-can-vote={canVote}
                 aria-pressed={chosen}
-                onClick={() => openSheet(contestant)}
+                onClick={(clickEvent) => {
+                  openedFrom.current = clickEvent.currentTarget;
+                  dispatchSheets({ type: 'openDetail', contestant });
+                }}
               >
                 <span className={`card__art${contestant.photo !== null ? ' card__art--photo' : ''}`}>
                   <ContestantArt contestant={contestant} />
@@ -405,7 +429,15 @@ export function VoteView({ store }: { store: VoteStore }): JSX.Element {
       {promoAtBottom && <PromoBannerSlot placement="bottom" />}
 
 
-      <Sheet open={picked !== null} onClose={() => setPicked(null)} labelledBy="confirm-title">
+      <ContestantDetail
+        contestant={showing === 'detail' ? sheets.detail : null}
+        label={sheets.detail === null ? '' : labelLine(sheets.detail)}
+        canVote={canVote}
+        onVote={voteFromDetail}
+        onClose={closeDetail}
+      />
+
+      <Sheet open={picked !== null} onClose={backFromConfirm} labelledBy="confirm-title">
         {picked !== null && (
           <>
             <div className={`sheet__art${picked.photo !== null ? ' sheet__art--photo' : ''}`}>
@@ -419,7 +451,7 @@ export function VoteView({ store }: { store: VoteStore }): JSX.Element {
                   <button
                     type="button"
                     className="button button--ghost button--wide"
-                    onClick={() => setPicked(null)}
+                    onClick={backFromConfirm}
                   >
                     Back
                   </button>
@@ -466,7 +498,7 @@ export function VoteView({ store }: { store: VoteStore }): JSX.Element {
                   <button
                     type="button"
                     className="button button--ghost button--wide"
-                    onClick={() => setPicked(null)}
+                    onClick={backFromConfirm}
                   >
                     Back
                   </button>

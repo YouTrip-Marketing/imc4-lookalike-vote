@@ -880,10 +880,19 @@ a.promo-banner:focus-visible {
   line-clamp: 3;
 }
 
+/*
+ * Phones (Revision 13f): one line of pitch (the detail sheet, Revision 13e,
+ * shows it in full) and tighter tracking on the label, so the caption, and the
+ * dark band behind it, stay below the chin.
+ */
 @media (max-width: 599px) {
   .card__pitch {
-    -webkit-line-clamp: 2;
-    line-clamp: 2;
+    -webkit-line-clamp: 1;
+    line-clamp: 1;
+  }
+
+  .card__label {
+    letter-spacing: 0.06em;
   }
 }
 
@@ -1538,6 +1547,42 @@ a.promo-banner:focus-visible {
 
 .grid:focus {
   outline: none;
+}
+
+/*
+ * Revision 13e: the contestant detail sheet. The photo larger than on the card
+ * (same 4:5 frame, no treatment), then name, label, the full pitch, VOTE, Close.
+ * The sheet scrolls inside itself if a long pitch needs it (.sheet max-height).
+ */
+.sheet--detail .sheet__art {
+  width: min(240px, 62%);
+  height: auto;
+  aspect-ratio: 4 / 5;
+  margin-bottom: 16px;
+}
+
+.sheet .detail__label {
+  margin-top: 6px;
+  color: var(--lilac);
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.sheet .detail__pitch {
+  margin-top: 12px;
+  color: var(--white);
+  font-size: 0.9375rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 599px) {
+  .sheet--detail .sheet__art {
+    width: min(180px, 52%);
+    height: auto;
+  }
 }
 
 /* The post-vote "Your vote is in" panel: heading, the creative, the promo's lines, then the buttons. */

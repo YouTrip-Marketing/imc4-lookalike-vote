@@ -1,6 +1,6 @@
-import { useEffect, useId } from 'react';
+import { useId } from 'react';
 import { promoBanner, promoDetails } from '../../event.config';
-import { Sheet } from './common';
+import { Sheet, useBackClosesSheet } from './common';
 
 /** Below this width the optional phone image is used. */
 const PHONE_QUERY = '(max-width: 639px)';
@@ -100,25 +100,10 @@ export function PromoPopup({
   votedForName?: string;
 }): JSX.Element | null {
   const headingId = useId();
-  useEffect(() => {
-    if (!open) return undefined;
-    window.history.pushState({ imc4PromoPopup: true }, '');
-    const onBack = (): void => onClose();
-    window.addEventListener('popstate', onBack);
-    return () => window.removeEventListener('popstate', onBack);
-  }, [open, onClose]);
+  const close = useBackClosesSheet(open, onClose, 'imc4PromoPopup');
 
   // Not in the page at all while closed: only one dialog.sheet exists at a time.
   if (!open || !hasPromoBanner()) return null;
-
-  const close = (): void => {
-    // Closed with the button or the backdrop: take back the history entry it added.
-    if ((window.history.state as { imc4PromoPopup?: boolean } | null)?.imc4PromoPopup === true) {
-      window.history.back();
-    } else {
-      onClose();
-    }
-  };
   const link = safeHref(promoBanner.href);
 
   return (
