@@ -10,7 +10,14 @@
 # Repository secrets (Settings > Secrets and variables > Actions):
 #   CLOUDFLARE_API_TOKEN   API token with "Cloudflare Pages: Edit" on this account
 #   CLOUDFLARE_ACCOUNT_ID  the account id
-#   VITE_SHEET_ENDPOINT    the Apps Script web app address (.../exec), as in .env.production
+#
+# Pages project settings (Cloudflare dashboard > the project > Settings >
+# Variables and Secrets, Production), read by functions/api/vote.ts at run time,
+# never by the build:
+#   SHEET_ENDPOINT         the Apps Script web app address (.../exec)
+#   TURNSTILE_SECRET_KEY   the Turnstile secret key (secret)
+# The Apps Script address left the build on 6 Nov 2026: the page talks to
+# /api/vote, which is deployed from functions/ by the same wrangler command.
 name: Deploy to Cloudflare Pages
 
 on:
@@ -40,10 +47,12 @@ jobs:
       - name: Unit tests
         run: npm test
 
-      - name: Production build (sheet adapter)
+      - name: Production build (sheet adapter through /api/vote)
         env:
           VITE_STORAGE_ADAPTER: sheet
-          VITE_SHEET_ENDPOINT: ${{ secrets.VITE_SHEET_ENDPOINT }}
+          VITE_SHEET_ENDPOINT: /api/vote
+          # Public site key; the matching secret is the Pages project's TURNSTILE_SECRET_KEY.
+          VITE_TURNSTILE_SITE_KEY: 0x4AAAAAAF0mlSd9gNxDiH7N
         run: npm run build:prod:cf
 
       - name: Deploy

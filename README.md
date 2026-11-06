@@ -677,12 +677,15 @@ people to try scripts. What is built in:
 - The page refuses to render inside another site's frame.
 - Burst flags in the admin view.
 
-What is **not** built in, and should be added for launch: a CAPTCHA-style check
+What is **not** built in here, and should be added for launch: a CAPTCHA-style check
 on the vote, such as Cloudflare Turnstile, and ideally email verification. None
 of the above stops a script that invents email addresses; a check that the
 caller is a person does, and a one-time code makes each address cost a real
 inbox. The seam is ready: `humanCheck` in `server/handler.ts`. It was
 left unconnected because this draft integrates no third-party service.
+
+(The production sheet build got exactly that check on 6 Nov 2026, in front of
+Apps Script rather than this API: see "Bot check and relay" under Launch.)
 
 ## Privacy and retention
 
@@ -786,13 +789,11 @@ The same production build is served from two places. Both talk to the same Code.
 
 | Host | Address | Role | Build | Redeploy |
 |---|---|---|---|---|
-| **Cloudflare Pages** | https://youtrip-lookalike-vote.pages.dev | **Canonical: the only address in comms** | `npm run build:prod:cf` writes `dist-prod-cf/`, adds `deploy/cloudflare/_headers` | `npm run build:prod:cf && npx wrangler pages deploy dist-prod-cf --project-name youtrip-lookalike-vote --branch main` |
-| GitHub Pages | https://youtrip-marketing.github.io/imc4-lookalike-vote/ | Backup, kept live | `npm run build:prod` writes `dist-prod/` | `npm run build:prod && touch dist-prod/.nojekyll && cd dist-prod && git add -A && git commit -m "Publish" && git push https://github.com/YouTrip-Marketing/imc4-lookalike-vote.git gh-pages:gh-pages` |
+| **Cloudflare Pages** | https://youtrip-lookalike-vote.pages.dev | **Canonical: the only address in comms, and since 6 Nov 2026 the only host that can take a vote** | `npm run build:prod:cf` writes `dist-prod-cf/`, adds `deploy/cloudflare/_headers`; `functions/api/vote.ts` ships beside it | Merge to `main` (`.github/workflows/deploy-cloudflare-pages.yml`), or by hand from the repository root: `npm run build:prod:cf && npx wrangler pages deploy dist-prod-cf --project-name youtrip-lookalike-vote --branch main` |
+| GitHub Pages | https://youtrip-marketing.github.io/imc4-lookalike-vote/ | **Retired as a voting host, 6 Nov 2026.** Static files only: it cannot run `/api/vote`, so a vote from there fails as "could not be reached". Switch it off (Settings > Pages > Source: None) or leave a redirect to the Cloudflare address | — | — |
 
-- Both builds run the same `check:deploy` gate first, and the bundles are identical. Vite's base is `./`, so one build works at a domain root and under `/imc4-lookalike-vote/`.
-- Routing is by hash (`#/admin`), so Cloudflare needs no `_redirects` file.
-- `_headers` repeats the page's robots-noindex and no-referrer meta tags as headers. It adds nosniff, frame denial and a restrictive Permissions-Policy, and caches `assets/*` for a year, since those files are content-hashed. There is no CSP on either host.
-- **Publish both hosts after every change**, so they never drift.
+- Vite's base is `./`, so the build works at a domain root and under a sub-path; routing is by hash (`#/admin`), so Cloudflare needs no `_redirects` file.
+- `_headers` repeats the page's robots-noindex and no-referrer meta tags as headers. It adds nosniff, frame denial and a restrictive Permissions-Policy, and caches `assets/*` for a year, since those files are content-hashed. There is no CSP.
 - **The Cloudflare production branch is `main`** (the project was created in the dashboard). Deploy with `--branch main`. Any other branch name becomes a Preview at `<branch>.youtrip-lookalike-vote.pages.dev`, and the bare address does not change.
 - **Wrangler gotcha (4.152.0):** when wrangler detects an AI agent, `pages project create` and a first `pages deploy` to a NEW project are redirected to Cloudflare Workers. That path fails on this project (Vite 5). A person running the command in their own terminal, or any deploy to a project that already exists, goes straight to Pages.
 
@@ -808,13 +809,39 @@ Paste the CURRENT `apps-script/Code.gs`: it changed on 26 Oct (window, admin pas
 If "Anyone" is not offered (Workspace policy), use a personal Google account: share the sheet with it as Editor, and do steps 1–6 from that account. The script refuses any spreadsheet but this one.
 Later changes to Code.gs: **Deploy > Manage deployments > pencil > New version**. Same URL.
 
-### 2. Build and publish (3 commands)
+### 2. Build and publish
+Merging to `main` builds and deploys (`.github/workflows/deploy-cloudflare-pages.yml`). By hand, from the repository root so wrangler finds `functions/`:
 ```bash
-cp .env.production.example .env.production   # paste the /exec URL into VITE_SHEET_ENDPOINT
-npm run build:prod && touch dist-prod/.nojekyll   # runs check:deploy first; refuses anything not ready
-cd dist-prod && git add -A && git commit -m "Publish voting site" && git push https://github.com/YouTrip-Marketing/imc4-lookalike-vote.git gh-pages:gh-pages
+cp .env.production.example .env.production   # /api/vote and the Turnstile site key; nothing to paste
+npm run build:prod:cf                          # runs check:deploy first; refuses anything not ready
+npx wrangler pages deploy dist-prod-cf --project-name youtrip-lookalike-vote --branch main
 ```
-`dist-prod/` is its own git repo on branch `gh-pages`; Vite keeps `dist-prod/.git` when it rebuilds.
+The Apps Script `/exec` address is **not** in the build any more: it is the Pages project's `SHEET_ENDPOINT` variable (next section).
+
+### Bot check and relay: `/api/vote` (6 Nov 2026)
+From 6 Nov the page never talks to Apps Script directly. Every request goes to `/api/vote` on the same host, a Cloudflare Pages Function (`functions/api/vote.ts`) that:
+
+- **requires a Cloudflare Turnstile token with every vote** and checks it with Cloudflare before anything is forwarded. The page gets the token right before it sends (`src/turnstile.ts`, invisible unless Cloudflare asks the visitor to tap a checkbox). A vote without a valid token is refused as `human_check_failed` and never reaches the sheet;
+- **records the caller's address as Cloudflare saw it** (`CF-Connecting-IP`) in the sheet's IP column. The page's own lookup (api.ipify.org) is gone from production; the value is no longer forgeable from the page;
+- **keeps the Apps Script address out of the public bundle**, so a script cannot post to the sheet around the check;
+- relays the sheet's answers unchanged (duplicate, closed, busy), so the page behaves as before. `GET /api/vote?view=contestants` and the `#/admin` tally pass through the same way.
+
+What this does not do, on purpose: no per-IP cap, no email verification, no change to `Code.gs` or the sheet. One vote per email is still the rule; the organiser panel's burst flags and the IP column (now real) are the audit trail.
+
+**Settings (Kelicia, Cloudflare dashboard > Workers & Pages > youtrip-lookalike-vote > Settings > Variables and Secrets, Production environment):**
+
+| Name | Value | Type |
+|---|---|---|
+| `SHEET_ENDPOINT` | the Apps Script web app address, `https://script.google.com/macros/s/<id>/exec` | plain text |
+| `TURNSTILE_SECRET_KEY` | the secret key of the Turnstile widget whose site key is `0x4AAAAAAF0mlSd9gNxDiH7N` (Cloudflare dashboard > Turnstile) | **secret** |
+
+Without both, `/api/vote` answers `misconfigured` and the page shows "The voting site is not set up correctly". The repository secret `VITE_SHEET_ENDPOINT` is no longer read and can be deleted.
+
+**Closing the old door.** The Apps Script address was in the public bundle from 26 Oct to this deploy, so anyone who copied it can still post to the sheet directly until that deployment is retired. After this is live and a real vote has gone through: in the sheet's Apps Script editor, **Deploy > New deployment** (a new `/exec` address), put the new address in `SHEET_ENDPOINT`, confirm a vote again, then **Deploy > Manage deployments > the old deployment > Archive**. The GitHub Pages copy (old bundle, old address) should go at the same time.
+
+**Checking it is live:** `curl -s -X POST https://youtrip-lookalike-vote.pages.dev/api/vote -d '{}'` answers `{"ok":false,"error":"human_check_failed"}` (the function is deployed and configured; nothing was written). `misconfigured` means a setting is missing; an HTML 404/405 page means the Function did not ship (deploy must run from the repository root, where `functions/` is).
+
+**Local rehearsal:** `npm run build:prod:cf` with the env above, then `npx wrangler pages dev dist-prod-cf --binding SHEET_ENDPOINT=http://127.0.0.1:4190/exec --binding TURNSTILE_SECRET_KEY=1x0000000000000000000000000000000AA` against the sheet stub (`scripts/sheet-stub-server.ts`), and post a vote with `"turnstileToken":"XXXX.DUMMY.TOKEN.XXXX"` (Cloudflare's always-pass test pair). Unit tests: `tests/vote-relay.test.ts` runs the Function against the real `Code.gs`.
 
 ### 3. Check, then clean up
 1. Open the URL: no banner, "Voting opens soon", Mon 2 Nov 12:00pm SGT.
@@ -823,7 +850,8 @@ cd dist-prod && git add -A && git commit -m "Publish voting site" && git push ht
 
 ### Known limits
 - Emails are not verified: anyone can vote once per made-up address. One-time-code verification was recommended and never built. **Risk accepted by Kelicia, 26 Oct 2026.**
-- IP is self-reported by the page (api.ipify.org), indicative only and forgeable. Never used to refuse a vote.
+- Since 6 Nov 2026 the IP column holds the address Cloudflare saw (`/api/vote`); rows before that date were self-reported by the page and forgeable. Still never used to refuse a vote.
+- The bot check (Turnstile) stops scripts, not people: a person can still vote once per made-up address, at a person's speed. Audit the sheet before announcing (votes per IP, bursts, address patterns).
 - Apps Script quotas: about 30 simultaneous executions; a burst of votes may see "busy" and retry automatically (4 tries with backoff).
 - The tally is read by `#/admin` with the passcode; there are no public counts.
 

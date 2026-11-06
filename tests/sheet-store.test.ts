@@ -45,11 +45,22 @@ async function rejection(promise: Promise<unknown>): Promise<VoteError> {
 }
 
 describe('the sheet store (test site)', () => {
-  it('accepts only an Apps Script /exec address, or localhost for tests', () => {
-    for (const endpoint of ['', 'https://example.com/exec', 'https://script.google.com/macros/s/x/dev', 'http://script.google.com/macros/s/x/exec']) {
+  it('accepts /api/vote (with a token source), an Apps Script /exec address, or localhost for tests', () => {
+    for (const endpoint of ['', 'https://example.com/exec', 'https://script.google.com/macros/s/x/dev', 'http://script.google.com/macros/s/x/exec', 'api/vote']) {
       expect(() => store({ endpoint })).toThrow(/VITE_SHEET_ENDPOINT/);
     }
     expect(() => store({ endpoint: 'http://127.0.0.1:4190/exec' })).not.toThrow();
+    expect(() => store({ endpoint: '/api/vote', humanToken: async () => 't' })).not.toThrow();
+    // Without a token source every vote through the relay would be refused: fail at start-up instead.
+    expect(() => store({ endpoint: '/api/vote' })).toThrow(/VITE_TURNSTILE_SITE_KEY/);
+  });
+
+  it('a direct Apps Script address sends no token (test site), and the sheet still takes the vote', async () => {
+    const script = loadAppsScript({ adminKey: ADMIN, window: { opensAt: '2026-10-26T00:00:00+08:00', closesAt: '2026-11-12T23:59:00+08:00' }, now: () => new Date('2026-11-07T12:00:00+08:00') });
+    const fetch = fetchInto(script);
+    await store({ fetch }).castVote('c07', 'a@example.com', 'req-0001-aaaa');
+    const body = JSON.parse(String(fetch.mock.calls[0]?.[1]?.body)) as Record<string, unknown>;
+    expect(body).not.toHaveProperty('turnstileToken');
   });
 
   it('production: no banner, and the configured window decides whether voting is open', async () => {

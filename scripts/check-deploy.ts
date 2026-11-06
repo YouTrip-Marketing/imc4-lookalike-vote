@@ -93,6 +93,10 @@ export function readCodeGsFacts(path: string): CodeGsFacts | null {
 }
 
 const SHEET_ENDPOINT = /^https:\/\/script\.google\.com\/macros\/s\/[A-Za-z0-9_-]+\/exec$/;
+/** The Pages Function that relays to the sheet (functions/api/vote.ts). */
+const RELAY_ENDPOINT = /^\/api\/[A-Za-z0-9_-]+$/;
+/** A real Turnstile site key. Cloudflare's test keys start 1x/2x/3x and always pass, block or challenge. */
+const TURNSTILE_SITE_KEY = /^0x[A-Za-z0-9_-]{10,}$/;
 const DEMO_PASSCODE_SHA256 = createHash('sha256').update('demo-admin', 'utf8').digest('hex');
 
 /**
@@ -105,9 +109,21 @@ function checkSheetBuild(
   codeGs: CodeGsFacts | null | undefined,
 ): string[] {
   const problems: string[] = [];
-  if (!SHEET_ENDPOINT.test((env.VITE_SHEET_ENDPOINT ?? '').trim())) {
+  const endpoint = (env.VITE_SHEET_ENDPOINT ?? '').trim();
+  if (SHEET_ENDPOINT.test(endpoint)) {
     problems.push(
-      'VITE_SHEET_ENDPOINT must be the Apps Script web app address, https://script.google.com/macros/s/<id>/exec.',
+      'VITE_SHEET_ENDPOINT is the Apps Script address itself. Since 6 Nov 2026 the page reaches the sheet only ' +
+        'through /api/vote (functions/api/vote.ts, Cloudflare Turnstile): a direct address would be public in the ' +
+        'bundle and let scripts vote without the check. Set VITE_SHEET_ENDPOINT=/api/vote; the Apps Script address ' +
+        "is the Pages project's SHEET_ENDPOINT variable.",
+    );
+  } else if (!RELAY_ENDPOINT.test(endpoint)) {
+    problems.push('VITE_SHEET_ENDPOINT must be /api/vote, the Pages Function that relays votes to the sheet.');
+  }
+  if (!TURNSTILE_SITE_KEY.test((env.VITE_TURNSTILE_SITE_KEY ?? '').trim())) {
+    problems.push(
+      'VITE_TURNSTILE_SITE_KEY must be the real Cloudflare Turnstile site key (starts with 0x). ' +
+        'Missing, /api/vote refuses every vote; a 1x/2x/3x test key lets every script through.',
     );
   }
   if (!/^https:\/\//i.test((config.promoBanner?.href ?? '').trim())) {

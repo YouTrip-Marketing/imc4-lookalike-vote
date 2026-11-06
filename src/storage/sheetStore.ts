@@ -2,6 +2,7 @@ import { contestants as configuredContestants, votingRules, votingWindow } from 
 import { canonicalEmail } from '../domain/email';
 import { VoteError, isVoteErrorCode } from '../domain/errors';
 import { effectiveStatus } from '../domain/voting';
+import { turnstileToken } from '../turnstile';
 import type {
   AdminSnapshot,
   AdminVoteRow,
@@ -33,17 +34,23 @@ import type { VoteStore } from './VoteStore';
  * Requests go as text/plain so the browser sends them without a CORS
  * preflight, which Apps Script web apps cannot answer.
  *
- * IP (self-reported): Apps Script never sees the voter's IP address, so the
- * page asks a public lookup service for its own and sends that with the vote.
- * INDICATIVE ONLY and forgeable. It is never used to accept or refuse a vote.
- * The production API records the real address on the server.
+ * Two ways to reach the sheet (6 Nov 2026):
+ *   /api/vote (production): the Cloudflare Pages Function in
+ *     functions/api/vote.ts. It holds the Apps Script address (so the address
+ *     is not in this bundle), requires a Cloudflare Turnstile token with every
+ *     vote (`humanToken` supplies it) and records the real caller IP. The page
+ *     does no IP lookup in this mode.
+ *   The Apps Script /exec address itself (test site, local tests): no token.
+ *     IP is self-reported: the page asks a public lookup service for its own
+ *     and sends that. INDICATIVE ONLY and forgeable, never used to accept or
+ *     refuse a vote.
  */
 
 /** Public "what is my IP" service. Answers {"ip":"..."} with CORS open. */
 export const DEFAULT_IP_LOOKUP_URL = 'https://api.ipify.org?format=json';
 
 export interface SheetStoreOptions {
-  /** The web app's /exec address. */
+  /** /api/vote (the Pages Function), or the web app's /exec address. */
   endpoint: string;
   contestants: readonly Pick<Contestant, 'id' | 'number' | 'stageName'>[];
   window: VotingWindow;
@@ -58,6 +65,12 @@ export interface SheetStoreOptions {
   /** Where the page looks up its own public IP. Omit to skip the lookup ('unavailable'). */
   ipLookupUrl?: string;
   ipTimeoutMs?: number;
+  /**
+   * A fresh Turnstile token for one attempt, asked for right before each vote
+   * is sent (src/turnstile.ts). Required with a /api/... endpoint: the relay
+   * refuses every vote without one.
+   */
+  humanToken?: () => Promise<string>;
 }
 
 const IP_PATTERN = /^[0-9A-Fa-f:.]{3,45}$/;
@@ -72,6 +85,8 @@ interface SheetVote {
 
 const ENDPOINT_PATTERN =
   /^https:\/\/script\.google\.com\/macros\/s\/[A-Za-z0-9_-]+\/exec$|^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?\/\S*$/;
+/** The same-origin relay (functions/api/vote.ts). */
+export const RELAY_ENDPOINT_PATTERN = /^\/api\/[A-Za-z0-9_-]+$/;
 
 /** "iPhone · Instagram", "Android · Chrome", "Mac · Safari". Nothing more specific. */
 export function deviceLabel(userAgent: string): string {
@@ -129,10 +144,17 @@ export class SheetVoteStore implements VoteStore {
 
   constructor(private readonly options: SheetStoreOptions) {
     const endpoint = options.endpoint.trim();
-    if (!ENDPOINT_PATTERN.test(endpoint)) {
+    const relay = RELAY_ENDPOINT_PATTERN.test(endpoint);
+    if (!relay && !ENDPOINT_PATTERN.test(endpoint)) {
       throw new VoteError(
         'misconfigured',
-        'VITE_SHEET_ENDPOINT must be the Apps Script web app address ending in /exec.',
+        'VITE_SHEET_ENDPOINT must be /api/vote or the Apps Script web app address ending in /exec.',
+      );
+    }
+    if (relay && options.humanToken === undefined) {
+      throw new VoteError(
+        'misconfigured',
+        'VITE_TURNSTILE_SITE_KEY is not set: /api/vote refuses every vote without a Turnstile token.',
       );
     }
     this.endpoint = endpoint;
@@ -306,6 +328,7 @@ export class SheetVoteStore implements VoteStore {
     if (canonicalEmail(email) === null) throw new VoteError('invalid_email');
 
     const ip = await this.lookupIp();
+    const token = this.options.humanToken === undefined ? undefined : await this.options.humanToken();
     const data = await this.request({
       method: 'POST',
       // text/plain: a "simple" request, so no preflight (see the class comment).
@@ -317,6 +340,7 @@ export class SheetVoteStore implements VoteStore {
         voteId: requestId,
         device: this.device,
         ip,
+        ...(token === undefined ? {} : { turnstileToken: token }),
         ...(this.organiserKey === null ? {} : { adminKey: this.organiserKey }),
       }),
     });
@@ -362,8 +386,19 @@ export class SheetVoteStore implements VoteStore {
   }
 }
 
-/** Wires the sheet store to event.config.ts. */
-export function createSheetStore(endpoint: string, ipLookupUrl?: string, testMode = false): SheetVoteStore {
+/**
+ * Wires the sheet store to event.config.ts. With /api/vote, every vote first
+ * gets a Turnstile token for `turnstileSiteKey`, and the page's own IP lookup
+ * is skipped (the relay records the real address).
+ */
+export function createSheetStore(
+  endpoint: string,
+  ipLookupUrl?: string,
+  testMode = false,
+  turnstileSiteKey?: string,
+): SheetVoteStore {
+  const relay = RELAY_ENDPOINT_PATTERN.test(endpoint.trim());
+  const siteKey = (turnstileSiteKey ?? '').trim();
   const store = new SheetVoteStore({
     endpoint,
     contestants: configuredContestants,
@@ -371,9 +406,12 @@ export function createSheetStore(endpoint: string, ipLookupUrl?: string, testMod
     rules: votingRules,
     testMode,
     userAgent: typeof navigator === 'undefined' ? '' : navigator.userAgent,
-    ipLookupUrl: ipLookupUrl === undefined || ipLookupUrl.trim() === '' ? DEFAULT_IP_LOOKUP_URL : ipLookupUrl.trim(),
+    ...(relay
+      ? {}
+      : { ipLookupUrl: ipLookupUrl === undefined || ipLookupUrl.trim() === '' ? DEFAULT_IP_LOOKUP_URL : ipLookupUrl.trim() }),
+    ...(siteKey === '' ? {} : { humanToken: () => turnstileToken(siteKey) }),
   });
   // Start the lookup while the page loads, so it is ready by the time someone votes.
-  void store.lookupIp();
+  if (!relay) void store.lookupIp();
   return store;
 }

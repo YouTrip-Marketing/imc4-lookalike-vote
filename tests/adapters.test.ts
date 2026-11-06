@@ -371,8 +371,10 @@ describe('the deploy check', () => {
   describe('Google Sheet store (production from 26 Oct 2026)', () => {
     const sheetEnv = {
       VITE_STORAGE_ADAPTER: 'sheet',
-      VITE_SHEET_ENDPOINT: 'https://script.google.com/macros/s/AKfycbAbc_123-x/exec',
+      VITE_SHEET_ENDPOINT: '/api/vote',
+      VITE_TURNSTILE_SITE_KEY: '0x4AAAAAAF0mlSd9gNxDiH7N',
     };
+    const appsScriptUrl = 'https://script.google.com/macros/s/AKfycbAbc_123-x/exec';
     const goodCodeGs = {
       adminKeySha256: 'a'.repeat(64),
       opensAt: votingWindow.opensAt ?? '',
@@ -398,10 +400,21 @@ describe('the deploy check', () => {
       expect(problems({ ...sheetEnv, VITE_TEST_DEPLOY: '1' })).toMatch(/TEST SITE build/);
     });
 
-    it.each(['', 'https://example.com/exec', 'https://script.google.com/macros/s/abc/dev', 'http://script.google.com/macros/s/abc/exec'])(
+    it.each(['', 'https://example.com/exec', 'https://script.google.com/macros/s/abc/dev', 'api/vote', '/api/vote?x=1', 'http://127.0.0.1:4190/exec'])(
       'refuses a sheet address of "%s"',
       (endpoint) => {
-        expect(problems({ ...sheetEnv, VITE_SHEET_ENDPOINT: endpoint })).toMatch(/VITE_SHEET_ENDPOINT/);
+        expect(problems({ ...sheetEnv, VITE_SHEET_ENDPOINT: endpoint })).toMatch(/VITE_SHEET_ENDPOINT must be \/api\/vote/);
+      },
+    );
+
+    it('refuses the Apps Script address itself since 6 Nov 2026 (it would be public, and votes would skip Turnstile)', () => {
+      expect(problems({ ...sheetEnv, VITE_SHEET_ENDPOINT: appsScriptUrl })).toMatch(/through \/api\/vote/);
+    });
+
+    it.each(['', '1x00000000000000000000AA', '2x00000000000000000000AB', '3x00000000000000000000FF', 'abc'])(
+      'refuses a Turnstile site key of "%s" (missing, test key or junk)',
+      (key) => {
+        expect(problems({ ...sheetEnv, VITE_TURNSTILE_SITE_KEY: key })).toMatch(/VITE_TURNSTILE_SITE_KEY/);
       },
     );
 
@@ -430,7 +443,7 @@ describe('the deploy check', () => {
     });
 
     it('an api build carrying a sheet address is refused', () => {
-      expect(checkDeploy({ ...ready, VITE_SHEET_ENDPOINT: sheetEnv.VITE_SHEET_ENDPOINT }).problems.join(' ')).toMatch(/VITE_SHEET_ENDPOINT/);
+      expect(checkDeploy({ ...ready, VITE_SHEET_ENDPOINT: appsScriptUrl }).problems.join(' ')).toMatch(/VITE_SHEET_ENDPOINT/);
     });
   });
 

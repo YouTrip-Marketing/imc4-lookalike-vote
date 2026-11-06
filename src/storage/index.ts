@@ -25,6 +25,7 @@ export async function createVoteStore(): Promise<VoteStore> {
       import.meta.env.VITE_SHEET_ENDPOINT ?? '',
       import.meta.env.VITE_IP_LOOKUP_URL,
       import.meta.env.VITE_TEST_DEPLOY === '1',
+      import.meta.env.VITE_TURNSTILE_SITE_KEY,
     );
   }
 
