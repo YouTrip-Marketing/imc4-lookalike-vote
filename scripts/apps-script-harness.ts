@@ -92,6 +92,8 @@ export interface AppsScriptOptions {
   localPhotos?: boolean;
   /** Revision 15: a "Settings" tab with B1 = this value ("close now"). Omit for no Settings tab. */
   closedNow?: boolean | string;
+  /** Revision 16: the RELAY_KEY Script Property. Omit for not set (not enforced). */
+  relayKey?: string;
 }
 
 /** The real Code.gs constants, read from the file (for parity tests). */
@@ -178,6 +180,11 @@ export function loadAppsScript(options: AppsScriptOptions = {}): AppsScriptRun {
     ContentService: {
       MimeType: { JSON: 'application/json' },
       createTextOutput: (text: string) => ({ text, setMimeType: () => ({ text }) }),
+    },
+    PropertiesService: {
+      getScriptProperties: () => ({
+        getProperty: (name: string) => (name === 'RELAY_KEY' && options.relayKey !== undefined ? options.relayKey : null),
+      }),
     },
     CacheService: {
       getScriptCache: () => ({

@@ -16,6 +16,7 @@
 # never by the build:
 #   SHEET_ENDPOINT         the Apps Script web app address (.../exec)
 #   TURNSTILE_SECRET_KEY   the Turnstile secret key (secret)
+#   RELAY_KEY              shared with Code.gs's RELAY_KEY Script Property (secret, Revision 16)
 # The Apps Script address left the build on 6 Nov 2026: the page talks to
 # /api/vote, which is deployed from functions/ by the same wrangler command.
 name: Deploy to Cloudflare Pages

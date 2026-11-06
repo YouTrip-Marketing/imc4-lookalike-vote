@@ -850,12 +850,15 @@ What this does not do, on purpose: no per-IP cap, no email verification, no chan
 |---|---|---|
 | `SHEET_ENDPOINT` | the Apps Script web app address, `https://script.google.com/macros/s/<id>/exec` | plain text |
 | `TURNSTILE_SECRET_KEY` | the secret key of the Turnstile widget whose site key is `0x4AAAAAAF0mlSd9gNxDiH7N` (Cloudflare dashboard > Turnstile) | **secret** |
+| `RELAY_KEY` | Revision 16: a long random value (`openssl rand -hex 32`), the same as the Apps Script **Script Property** `RELAY_KEY`. The relay adds it to every vote; once the Script Property is set, Code.gs refuses any vote without it, so nobody can post straight to `/exec` and skip Turnstile | **secret** |
 
 Without both, `/api/vote` answers `misconfigured` and the page shows "The voting site is not set up correctly". The repository secret `VITE_SHEET_ENDPOINT` is no longer read and can be deleted.
 
 **Closing the old door.** The Apps Script address was in the public bundle from 26 Oct to this deploy, so anyone who copied it can still post to the sheet directly until that deployment is retired. After this is live and a real vote has gone through: in the sheet's Apps Script editor, **Deploy > New deployment** (a new `/exec` address), put the new address in `SHEET_ENDPOINT`, confirm a vote again, then **Deploy > Manage deployments > the old deployment > Archive**. The GitHub Pages copy (old bundle, old address) should go at the same time.
 
 **Checking it is live:** `curl -s -X POST https://youtrip-lookalike-vote.pages.dev/api/vote -d '{}'` answers `{"ok":false,"error":"human_check_failed"}` (the function is deployed and configured; nothing was written). `misconfigured` means a setting is missing; an HTML 404/405 page means the Function did not ship (deploy must run from the repository root, where `functions/` is).
+
+**Relay key rollout (Revision 16), in this order:** (1) paste Code.gs and deploy it as a New version of the existing deployment; (2) set the Pages secret `RELAY_KEY` and redeploy the page (a push, or re-run the workflow), so the relay starts sending it; (3) cast a test vote; (4) in Apps Script, Project Settings > Script properties, add `RELAY_KEY` with the same value. From that moment the sheet takes votes only from the relay; no redeploy needed. (5) Test vote again. To undo, delete the Script Property. Setting the Script Property before the relay sends the key stops every vote (`misconfigured`), which `tests/relay-key.test.ts` checks.
 
 **Local rehearsal:** `npm run build:prod:cf` with the env above, then `npx wrangler pages dev dist-prod-cf --binding SHEET_ENDPOINT=http://127.0.0.1:4190/exec --binding TURNSTILE_SECRET_KEY=1x0000000000000000000000000000000AA` against the sheet stub (`scripts/sheet-stub-server.ts`), and post a vote with `"turnstileToken":"XXXX.DUMMY.TOKEN.XXXX"` (Cloudflare's always-pass test pair). Unit tests: `tests/vote-relay.test.ts` runs the Function against the real `Code.gs`.
 

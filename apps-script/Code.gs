@@ -152,6 +152,8 @@ function doPost(e) {
     return reply_({ ok: false, error: 'invalid_vote' });
   }
   if (typeof vote !== 'object' || vote === null) return reply_({ ok: false, error: 'invalid_vote' });
+  // Revision 16: once the RELAY_KEY Script Property is set, only /api/vote may post a vote.
+  if (!fromRelay_(vote.relayKey)) return reply_({ ok: false, error: 'misconfigured' });
 
   var number = vote.contestantNumber;
   if (typeof number !== 'number' || Math.floor(number) !== number || number < 1 || number > CONTESTANT_COUNT) {
@@ -409,6 +411,23 @@ function shortRef_(counted) {
 }
 
 /** True when `key` is the admin passcode. Constant-time enough for a hash compare. */
+/**
+ * Revision 16, the shared key between the relay and this script. The relay
+ * (functions/api/vote.ts) adds `relayKey` from its RELAY_KEY secret to every
+ * vote it forwards. Set the same value as the Script Property RELAY_KEY
+ * (Project Settings > Script properties) and a vote posted straight to this
+ * web app, without the relay's Turnstile check, is refused. Not set: not
+ * enforced (the rollout turns it on without a redeploy). The key is never
+ * written to the sheet and never in this file.
+ */
+function fromRelay_(given) {
+  var expected = PropertiesService.getScriptProperties().getProperty('RELAY_KEY');
+  if (expected === null || expected === '') return true;
+  if (typeof given !== 'string' || given === '') return false;
+  // Compare digests: equal length whatever was sent.
+  return sha256Hex_(given) === sha256Hex_(expected);
+}
+
 function isAdmin_(key) {
   if (typeof key !== 'string' || key === '' || !/^[0-9a-f]{64}$/.test(ADMIN_KEY_SHA256)) return false;
   return sha256Hex_(key) === ADMIN_KEY_SHA256;

@@ -21,6 +21,8 @@
  * Settings (Pages project > Settings > Variables and Secrets, Production):
  *   SHEET_ENDPOINT        the Apps Script web app address (.../exec)
  *   TURNSTILE_SECRET_KEY  the Turnstile secret for the site key in the bundle
+ *   RELAY_KEY             (Revision 16, secret) shared with Code.gs's RELAY_KEY
+ *                         Script Property; optional until that property is set
  * Both missing or wrong answer `misconfigured`; nothing falls back to the
  * sheet directly.
  *
@@ -31,6 +33,11 @@
 export interface Env {
   SHEET_ENDPOINT?: string;
   TURNSTILE_SECRET_KEY?: string;
+  /**
+   * Revision 16: shared with Code.gs (its RELAY_KEY Script Property). Added to
+   * every vote forwarded, so the sheet can refuse votes that skipped this relay.
+   */
+  RELAY_KEY?: string;
 }
 
 /** The part of Cloudflare's Pages Function context this file uses. */
@@ -196,6 +203,9 @@ export async function relay(
     ip,
   };
   if (typeof vote.adminKey === 'string') payload.adminKey = vote.adminKey;
+  // Revision 16: from the Pages secret only, never from the page's own body.
+  const relayKey = (env.RELAY_KEY ?? '').trim();
+  if (relayKey !== '') payload.relayKey = relayKey;
 
   return forward(fetchImpl, endpoint, {
     method: 'POST',
