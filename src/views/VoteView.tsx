@@ -379,7 +379,7 @@ export function VoteView({ store }: { store: VoteStore }): JSX.Element {
                 aria-pressed={chosen}
                 onClick={() => openSheet(contestant)}
               >
-                <span className="card__art">
+                <span className={`card__art${contestant.photo !== null ? ' card__art--photo' : ''}`}>
                   <ContestantArt contestant={contestant} />
                 </span>
                 {/* Decorative: the number is already in the label line below. */}
@@ -413,7 +413,7 @@ export function VoteView({ store }: { store: VoteStore }): JSX.Element {
       <Sheet open={picked !== null} onClose={() => setPicked(null)} labelledBy="confirm-title">
         {picked !== null && (
           <>
-            <div className="sheet__art">
+            <div className={`sheet__art${picked.photo !== null ? ' sheet__art--photo' : ''}`}>
               <ContestantArt contestant={picked} compact />
             </div>
             {voted && marker?.contestantId === picked.id ? (

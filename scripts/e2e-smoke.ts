@@ -793,7 +793,7 @@ async function partD(
   const context = await browser.createBrowserContext();
   const voter = await open(context, `${openSite}${PAGES_BASE}`);
 
-  await step('runtime Top 10 dry run: names, handles and 10 photos from the Contestants tab, with the photo treatment', async () => {
+  await step('runtime Top 10 dry run: names, handles and 10 photos from the Contestants tab, shown as supplied (Revision 13c)', async () => {
     await see(voter, 'Dry Run 07');
     const cards = await voter.$$eval('.grid > li', (items) =>
       items.map((item) => ({
@@ -843,8 +843,24 @@ async function partD(
       },
       { timeout: 20_000 },
     );
-    const treatment = await voter.$eval('.grid .art--photo', (img) => getComputedStyle(img).filter);
-    assert.notEqual(treatment, 'none', 'the photo treatment is missing on a runtime photo');
+    // Revision 13c: photos as supplied. No filter, no tint layers; the scrim behind the caption stays.
+    const look = await voter.$eval('.grid > li:first-child', (card) => {
+      const wrap = card.querySelector('.card__art') as HTMLElement;
+      const img = card.querySelector('.art--photo') as HTMLElement;
+      const face = card.querySelector('.card__face') as HTMLElement;
+      return {
+        filter: getComputedStyle(img).filter,
+        tintBefore: getComputedStyle(wrap, '::before').content,
+        tintAfter: getComputedStyle(wrap, '::after').content,
+        scrim: getComputedStyle(face, '::after').backgroundImage,
+      };
+    });
+    assert.equal(look.filter, 'none', 'a filter still reaches the contestant photo');
+    assert.equal(look.tintBefore, 'none', 'the lilac tint layer still covers the photo');
+    assert.equal(look.tintAfter, 'none', 'the purple tint layer still covers the photo');
+    assert.match(look.scrim, /linear-gradient/, 'the scrim behind the caption is gone');
+    // Placeholders keep their look.
+    assert.equal(await voter.$('.grid .card__art--photo .art--placeholder'), null);
     const alt = await voter.$eval('.grid > li:nth-child(7) .art--photo', (img) => (img as HTMLImageElement).alt);
     assert.equal(alt, 'Dry Run 07, contestant 7');
     await voter.evaluate(() => window.scrollTo(0, 0));

@@ -754,6 +754,24 @@ a.promo-banner:focus-visible {
   mix-blend-mode: screen;
 }
 
+/*
+ * Revision 13c (Kelicia, 6 Nov 2026: "just the photo itself"): contestant
+ * photos are shown as supplied, full colour. The treatment above stays for the
+ * placeholder tiles only. The fade below the caption stays: it is the scrim that
+ * keeps the name, pitch and label readable over any photo.
+ */
+.card__art--photo .art,
+.sheet__art--photo .art {
+  filter: none;
+}
+
+.card__art--photo::before,
+.sheet__art--photo::before,
+.card__art--photo::after,
+.sheet__art--photo::after {
+  content: none;
+}
+
 /* Solid enough behind the name that a white photo still leaves it readable. */
 .card__face::after {
   content: '';

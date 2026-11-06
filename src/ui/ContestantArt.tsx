@@ -9,9 +9,10 @@ interface Props {
 /**
  * Contestant image slot, 4:5 portrait.
  *
- * Photos and placeholders both go through the same Spotlight Arena treatment,
- * which lives in CSS (`.card__art`, `.sheet__art`): high-contrast mono, then
- * toned purple. A photo dropped into the config needs no editing.
+ * Revision 13c (Kelicia, 6 Nov 2026): photos are shown as supplied, full colour,
+ * cover-cropped to 4:5. Only the placeholder tiles keep the purple Spotlight
+ * Arena treatment (CSS, `.card__art`, `.sheet__art`; photo wrappers carry the
+ * `--photo` modifier, which switches it off).
  *
  * With no photo configured this draws an abstract stage: a spotlight beam,
  * haze and a floor pool, in greys, varied per contestant so the grid does not

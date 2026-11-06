@@ -97,9 +97,10 @@ file's earlier time convention. The earlier placeholders (3 Nov 12:00 to 4 Nov
 `photo: 'contestants/01.jpg'`. Portrait **4:5**, 480 x 600 px (face roughly
 centred, head in the upper half), JPEG or WebP, aim for under 60 KB each: twenty
 of them load over mobile data. They are lazy-loaded. **No editing needed**: the
-page turns every photo into high-contrast mono toned purple by itself (see
-"Design"). Until a photo is set, the card shows a generated abstract stage
-(spotlight and haze) with the same treatment. It is deliberately not a face, a
+page shows every photo as supplied, full colour, cover-cropped to 4:5, with a
+dark fade behind the caption only (Revision 13c, Kelicia 6 Nov 2026: no filter).
+Until a photo is set, the card shows a generated abstract stage (spotlight and
+haze) in the purple treatment. It is deliberately not a face, a
 silhouette or anyone's likeness.
 
 **In production, changing the config is two steps.** The page reads the config at
@@ -119,7 +120,7 @@ flow, rules, backend and copy wording did not change.
 | Lime | **Reserved for the vote action (Confirm vote, Try sending again) and the selected card** (outline, numeral, "Your vote" badge). Nothing else |
 | Type | **Poppins**, YouTrip's brand font (Revision 6, 2026-09-30), replacing Anton and Inter everywhere. 800 for headlines and the outlined numerals; 700 for contestant names, buttons and headings (upper-cased by CSS; the text itself is unchanged); 400/500 for body, labels and inputs. Self-hosted from `@fontsource/poppins` (SIL Open Font License), Latin subset, four weights, **31.27 KB of WOFF2 in total** (about 7.8 KB each; the Anton + Inter set was about 96 KB). **The page requests no fonts from Google or anyone else**; the e2e test fails if any request leaves the site, and checks that no Anton or Inter file is loaded |
 | Card | 4:5 portrait, 4px corners. Giant outlined numeral top right (decorative, hidden from screen readers). Name and label line bottom left over a black fade. Label line = `No. 07`, then `tagline`, then `handle`, whichever exist |
-| Photo treatment | CSS only, so any photo dropped in gets it: `grayscale(1) contrast(1.25)`, then a lilac layer in `multiply` (whites become lilac) and a deep-purple layer in `screen` (blacks become purple; `#33076A` to `#1C0048` since Revision 8, taken from the key visual). A true duotone: the research tile's single `color` blend left pure white and pure black untouched, which the stress test showed. Contestant photos only; **not** the key visual |
+| Photo treatment | **Placeholder tiles only since Revision 13c** (contestant photos are shown as supplied, full colour; the `--photo` modifier on `.card__art` / `.sheet__art` switches it off). CSS only: `grayscale(1) contrast(1.25)`, then a lilac layer in `multiply` (whites become lilac) and a deep-purple layer in `screen` (blacks become purple; `#33076A` to `#1C0048` since Revision 8, taken from the key visual). A true duotone: the research tile's single `color` blend left pure white and pure black untouched, which the stress test showed. Contestant photos only; **not** the key visual |
 | Widths | 2 columns on phones, 3 from 640px, 4 from 900px (as in Revision 3) |
 | Admin | Same palette and type (Poppins), tables with tabular figures |
 
@@ -463,7 +464,7 @@ The page reads names, Instagram handles, taglines and photos from the **Contesta
 | Tagline | The finalist's one-line pitch (Revision 13b), up to 320 characters. Shown on its own line under the name, 3 lines at most (2 on phones), then "…". Optional. |
 | Photo | A Google Drive share link to the photo. The file must be shared **"Anyone with the link"**. A plain https image address also works. |
 
-How photos are served: a Drive link becomes `https://lh3.googleusercontent.com/d/<file id>=w960`, Google's image server, resized to 960px wide, so phone-size originals do not slow the page. The page applies the usual purple treatment. A photo that fails to load leaves the abstract tile; the name still shows.
+How photos are served: a Drive link becomes `https://lh3.googleusercontent.com/d/<file id>=w960`, Google's image server, resized to 960px wide, so phone-size originals do not slow the page. The page shows it as supplied, full colour (Revision 13c), with a dark fade behind the caption. A photo that fails to load leaves the abstract tile; the name still shows.
 
 Timings: the sheet caches the list for 60 seconds, the page asks once a minute until the reveal, then every 5 minutes, and keeps the last good list in the visitor's browser. Edits show within about 6 minutes. The Tally tab's names follow the Contestants tab.
 
