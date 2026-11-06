@@ -401,10 +401,13 @@ export function VoteView({ store }: { store: VoteStore }): JSX.Element {
                 <span className={`card__art${contestant.photo !== null ? ' card__art--photo' : ''}`}>
                   <ContestantArt contestant={contestant} />
                 </span>
-                {/* Decorative: the number is already in the label line below. */}
-                <span className="card__numeral" aria-hidden="true">
-                  {twoDigits(contestant.number)}
-                </span>
+                {/* Decorative: the number is already in the label line below. Placeholder
+                    tiles only (6 Nov 2026): on a real photo it sat across the face. */}
+                {contestant.photo === null && (
+                  <span className="card__numeral" aria-hidden="true">
+                    {twoDigits(contestant.number)}
+                  </span>
+                )}
                 {chosen && <span className="card__badge">Your vote</span>}
                 <span className="card__caption">
                   <span className="card__stage">{contestant.stageName}</span>

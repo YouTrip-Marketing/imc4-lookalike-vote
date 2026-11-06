@@ -874,6 +874,8 @@ async function partD(
       },
       { timeout: 20_000 },
     );
+    // 6 Nov 2026: no outline number over a real photo; the label carries the number.
+    assert.equal(await voter.$$eval('.grid .card__numeral', (nodes) => nodes.length), 0, 'an outline number sits over a photo');
     // Revision 13c: photos as supplied. No filter, no tint layers; the scrim behind the caption stays.
     const look = await voter.$eval('.grid > li:first-child', (card) => {
       const wrap = card.querySelector('.card__art') as HTMLElement;
