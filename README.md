@@ -471,7 +471,7 @@ Timings: the sheet caches the list for 60 seconds, the page asks once a minute u
 
 **1 Nov procedure (about 20 minutes):**
 1. Kelicia fills Name (and the optional columns) for 1 to 20 and pastes each photo's Drive link. Blank names are shaded yellow.
-2. Check before the reveal: `npx tsx scripts/contestants-check.ts <passcode file>`. It prints, for each number, whether the name and photo are OK (it uses the admin passcode to see the list early). Fix anything MISSING and run it again until it says 10/10 (it counts `contestants` in `event.config.ts`).
+2. Check: `npx tsx scripts/contestants-check.ts <passcode file>`. It prints, for each number, whether the name and photo are OK (it uses the admin passcode, so it also works before the reveal). Fix anything MISSING and run it again until it says 10/10 (it counts `contestants` in `event.config.ts`). Since 6 Nov 2026 it asks the live relay `https://youtrip-lookalike-vote.pages.dev/api/vote` by default, which passes the request through to Apps Script; `--endpoint <url>` or `CONTESTANTS_CHECK_ENDPOINT` points it elsewhere (an `/exec` address still works). It no longer reads `.env.production`.
 3. At 2 Nov 12:00 the page shows them by itself. No publish step.
 
 ### Custom domain later (CNAME)
