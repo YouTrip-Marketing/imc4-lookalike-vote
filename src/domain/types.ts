@@ -18,6 +18,7 @@ export interface Contestant {
    * contestants will submit is undecided, so nothing is filled in for the
    * placeholders. The label line is: "No. 07", then this, then the handle.
    */
+  /** Revision 13b: the finalist's one-line pitch (up to 320 characters), shown under the name. */
   tagline?: string;
 }
 

@@ -309,7 +309,7 @@ export class SheetVoteStore implements VoteStore {
         number,
         stageName: text(item.name, 40),
         handle: /^@[A-Za-z0-9._]{1,30}$/.test(text(item.handle, 31)) ? text(item.handle, 31) : '',
-        tagline: text(item.tagline, 40),
+        tagline: text(item.tagline, 320),
         photo: /^https:\/\/[^\s"'<>]+$|^http:\/\/127\.0\.0\.1:\d+\/[^\s"'<>]+$/.test(photo) ? photo : '',
       });
     }

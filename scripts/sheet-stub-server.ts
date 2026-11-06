@@ -18,11 +18,24 @@ import { loadAppsScript, type AppsScriptOptions, type AppsScriptRun } from './ap
 export const STUB_IP = '203.0.113.5';
 const PHOTO = readFileSync(resolve(import.meta.dirname, '..', 'public', 'promo', 'imc4-100-flights-korea-banner-1080x608.jpg'));
 
-/** A filled-in Contestants tab for the dry run: 10 names, handles, taglines, photo addresses on the stub. */
+/** Revision 13b: the shortest and longest pitch lengths in the real Contestants tab. */
+export const SHORT_PITCH = 'I dance like him on stage!!'.padEnd(28, '.');
+export const LONG_PITCH = ('Ever since my friends started calling me his twin I have practised every move, '
+  + 'every smile and every wave until strangers stop me on the MRT. I would love the chance to meet fans, '
+  + 'share the stage with the other finalists and show Singapore what a real lookalike looks like up close, '
+  + 'all the way to the final night.').slice(0, 300).padEnd(300, '.');
+
+/**
+ * A filled-in Contestants tab for the dry run: 10 names, handles, pitches (column D),
+ * photo addresses on the stub. Odd numbers get the short pitch, even the long one.
+ * No. 03 has no handle, like the real finalist with none.
+ */
 export function dryRunContestants(port: number): (string | number)[][] {
   return Array.from({ length: 10 }, (_, index) => {
     const n = String(index + 1).padStart(2, '0');
-    return [index + 1, `Dry Run ${n}`, `dryrun_${n}`, 'Town', `http://127.0.0.1:${port}/photo/${n}.jpg`];
+    const handle = index + 1 === 3 ? '' : `dryrun_${n}`;
+    const pitch = (index + 1) % 2 === 1 ? SHORT_PITCH : LONG_PITCH;
+    return [index + 1, `Dry Run ${n}`, handle, pitch, `http://127.0.0.1:${port}/photo/${n}.jpg`];
   });
 }
 

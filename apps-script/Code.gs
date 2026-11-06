@@ -71,6 +71,8 @@ var LOCAL_PHOTOS_FOR_TESTS = false;
 /** SHA-256 (hex) of the admin passcode. The passcode itself is never in this file. */
 var ADMIN_KEY_SHA256 = '0025f030d4ebb2462d18c614e97cd3ff9a4b2cf61b54f61968bf33385d0e1661';
 var CONTESTANT_COUNT = 10;
+/** Column D, the finalist's one-line pitch (Revision 13b; was 40). The longest is about 300. */
+var TAGLINE_MAX = 320;
 var TIME_ZONE = 'Asia/Singapore';
 var HEADER = [
   'Timestamp (SGT)', 'Email (as typed)', 'Canonical email', 'IP (self-reported)', 'Contestant no.',
@@ -264,7 +266,7 @@ function readContestants_() {
       no: no,
       name: cleanText_(rows[i][1], 40),
       handle: cleanHandle_(rows[i][2]),
-      tagline: cleanText_(rows[i][3], 40),
+      tagline: cleanText_(rows[i][3], TAGLINE_MAX),
       photo: photoAddress_(rows[i][4]),
     });
   }

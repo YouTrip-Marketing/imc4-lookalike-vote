@@ -460,7 +460,7 @@ The page reads names, Instagram handles, taglines and photos from the **Contesta
 | No. | 1 to 10 (Revision 13; was 1 to 20). The order of the Instagram posts. Do not change. |
 | Name | The contestant's stage name (up to 40 characters). Blank = "Contestant N" stays. |
 | Instagram handle | Optional. `@name` or `name`. Anything that is not a handle is dropped. |
-| Tagline | Optional, up to 40 characters (e.g. a town). |
+| Tagline | The finalist's one-line pitch (Revision 13b), up to 320 characters. Shown on its own line under the name, 3 lines at most (2 on phones), then "…". Optional. |
 | Photo | A Google Drive share link to the photo. The file must be shared **"Anyone with the link"**. A plain https image address also works. |
 
 How photos are served: a Drive link becomes `https://lh3.googleusercontent.com/d/<file id>=w960`, Google's image server, resized to 960px wide, so phone-size originals do not slow the page. The page applies the usual purple treatment. A photo that fails to load leaves the abstract tile; the name still shows.

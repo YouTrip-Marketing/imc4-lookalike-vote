@@ -49,9 +49,9 @@ const nameOf = (contestant: Contestant): string => `#${contestant.number} ${cont
 
 const twoDigits = (value: number): string => String(value).padStart(2, '0');
 
-/** "No. 07", then the optional tagline, then the optional handle. */
+/** "No. 07", then the optional handle (Revision 13b: the tagline/pitch has its own line). */
 function labelLine(contestant: Contestant): string {
-  return [`No. ${twoDigits(contestant.number)}`, contestant.tagline, contestant.handle]
+  return [`No. ${twoDigits(contestant.number)}`, contestant.handle]
     .filter((part): part is string => part !== undefined && part.trim() !== '')
     .join(' · ');
 }
@@ -389,6 +389,10 @@ export function VoteView({ store }: { store: VoteStore }): JSX.Element {
                 {chosen && <span className="card__badge">Your vote</span>}
                 <span className="card__caption">
                   <span className="card__stage">{contestant.stageName}</span>
+                  {/* Revision 13b: the finalist's pitch, clipped to 3 lines (2 on phones) by CSS. */}
+                  {contestant.tagline !== undefined && contestant.tagline.trim() !== '' && (
+                    <span className="card__pitch">{contestant.tagline}</span>
+                  )}
                   <span className="card__label">{labelLine(contestant)}</span>
                   {session.tallies !== null && (
                     <span className="card__count">

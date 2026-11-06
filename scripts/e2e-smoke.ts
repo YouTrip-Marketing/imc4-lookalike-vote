@@ -27,7 +27,7 @@ import { build, preview, type Plugin, type PreviewServer } from 'vite';
 import { burstRule, contestants, demo, event, keyVisual, promoBanner, promoDetails, votingWindow } from '../event.config';
 import { formatCalendarDateWithYear, formatSgtDateTime, formatSgtDayMonth } from '../src/domain/time';
 import { startLocalApiServer, type LocalApiServer } from './local-api-server';
-import { STUB_IP, dryRunContestants, startSheetStubServer, type SheetStubServer } from './sheet-stub-server';
+import { LONG_PITCH, SHORT_PITCH, STUB_IP, dryRunContestants, startSheetStubServer, type SheetStubServer } from './sheet-stub-server';
 
 const ROOT = resolve(import.meta.dirname, '..');
 const OUT = resolve(ROOT, 'e2e-artifacts');
@@ -472,7 +472,7 @@ const photos = { c01: 'light', c02: 'dark', c03: 'cast', c04: 'texture' };
 export const contestants = real.map((c) => {
   if (c.id in photos) return { ...c, photo: 'contestants/' + photos[c.id] + '.svg' };
   if (c.id === 'c05') return { ...c, stageName: ${JSON.stringify(LONG_NAME)}, tagline: 'East side', handle: '@stand.in.handle' };
-  if (c.id === 'c06') return { ...c, stageName: ${JSON.stringify(SHORT_NAME)} };
+  if (c.id === 'c06') return { ...c, stageName: ${JSON.stringify(SHORT_NAME)}, tagline: ${JSON.stringify(LONG_PITCH)} };
   return c;
 });
 `,
@@ -798,11 +798,38 @@ async function partD(
     const cards = await voter.$$eval('.grid > li', (items) =>
       items.map((item) => ({
         name: item.querySelector('.card__stage')?.textContent ?? '',
+        pitch: item.querySelector('.card__pitch')?.textContent ?? '',
         label: item.querySelector('.card__label')?.textContent ?? '',
       })),
     );
     assert.equal(cards.length, 10);
-    assert.deepEqual(cards[6], { name: 'Dry Run 07', label: 'No. 07 · Town · @dryrun_07' });
+    // Revision 13b: the pitch has its own line, in full (the CSS clips it); the label is number and handle.
+    assert.deepEqual(cards[6], { name: 'Dry Run 07', pitch: SHORT_PITCH, label: 'No. 07 · @dryrun_07' });
+    assert.deepEqual(cards[1], { name: 'Dry Run 02', pitch: LONG_PITCH, label: 'No. 02 · @dryrun_02' });
+    assert.deepEqual(cards[2], { name: 'Dry Run 03', pitch: SHORT_PITCH, label: 'No. 03' });
+    assert.equal(LONG_PITCH.length, 300);
+    assert.equal(SHORT_PITCH.length, 28);
+    const pitchLayout = await voter.$$eval('.grid > li', (items) =>
+      items.map((item) => {
+        const pitch = item.querySelector<HTMLElement>('.card__pitch');
+        const card = item.getBoundingClientRect();
+        const caption = item.querySelector('.card__caption')?.getBoundingClientRect();
+        const lineHeight = pitch ? parseFloat(getComputedStyle(pitch).lineHeight) : 0;
+        return {
+          lines: pitch ? Math.round(pitch.getBoundingClientRect().height / lineHeight) : 0,
+          clipped: pitch ? pitch.scrollHeight > pitch.clientHeight + 1 : false,
+          inside: caption !== undefined && caption.top >= card.top && caption.bottom <= card.bottom + 0.5,
+        };
+      }),
+    );
+    const phoneWidth = await voter.evaluate(() => window.innerWidth < 600);
+    const maxLines = phoneWidth ? 2 : 3;
+    for (const [index, layout] of pitchLayout.entries()) {
+      assert.ok(layout.lines >= 1 && layout.lines <= maxLines, `card ${index + 1}: pitch on ${layout.lines} lines, max ${maxLines}`);
+      assert.ok(layout.inside, `card ${index + 1}: caption runs outside the card`);
+    }
+    assert.equal(pitchLayout[1]?.clipped, true, 'the 300-character pitch should end in an ellipsis');
+    assert.equal(pitchLayout[0]?.clipped, false, 'the 28-character pitch should show in full');
     await voter.evaluate(async () => {
       for (const img of document.querySelectorAll<HTMLImageElement>('.grid .art--photo')) {
         img.loading = 'eager';
@@ -1661,7 +1688,7 @@ async function layouts(browser: Browser, site: string, variant: 'real' | 'kv'): 
         );
         assert.deepEqual(problems, []);
         const label = await page.$eval('.grid > li:nth-child(5) .card__label', (node) => node.textContent);
-        assert.equal(label, 'No. 05 · East side · @stand.in.handle');
+        assert.equal(label, 'No. 05 · @stand.in.handle');
       });
     }
 

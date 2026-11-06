@@ -831,6 +831,28 @@ a.promo-banner:focus-visible {
   text-shadow: 0 1px 10px rgba(var(--stage-rgb), 0.8);
 }
 
+/* Revision 13b: the pitch, under the name. 3 lines at most (2 on phones), then an ellipsis. */
+.card__pitch {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--white);
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+  text-shadow: 0 1px 8px rgba(var(--stage-rgb), 0.9);
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+}
+
+@media (max-width: 599px) {
+  .card__pitch {
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+  }
+}
+
 .card__label,
 .card__count {
   color: var(--lilac);

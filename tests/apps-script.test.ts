@@ -238,7 +238,7 @@ describe('Code.gs Contestants tab (runtime Top 20, 26 Oct 2026)', () => {
   const rows: (string | number)[][] = [
     [1, '  Kim  Lookalike ', 'kim.lookalike', 'Jurong West', `https://drive.google.com/file/d/${DRIVE_ID}/view?usp=sharing`],
     [2, 'Ahmad', '@ahmad_sg', '', `https://drive.google.com/open?id=${DRIVE_ID}`],
-    [3, 'Bad bits', 'not a handle!', 'x'.repeat(80), 'javascript:alert(1)'],
+    [3, 'Bad bits', 'not a handle!', 'x'.repeat(400), 'javascript:alert(1)'],
     [3, 'Second row for 3 is ignored', '', '', ''],
     [21, 'Out of range', '', '', ''],
     ['', '', '', '', ''],
@@ -264,7 +264,7 @@ describe('Code.gs Contestants tab (runtime Top 20, 26 Oct 2026)', () => {
     expect(after.contestants).toEqual([
       { no: 1, name: 'Kim Lookalike', handle: '@kim.lookalike', tagline: 'Jurong West', photo: `https://lh3.googleusercontent.com/d/${DRIVE_ID}=w960` },
       { no: 2, name: 'Ahmad', handle: '@ahmad_sg', tagline: '', photo: `https://lh3.googleusercontent.com/d/${DRIVE_ID}=w960` },
-      { no: 3, name: 'Bad bits', handle: '', tagline: 'x'.repeat(40), photo: '' },
+      { no: 3, name: 'Bad bits', handle: '', tagline: 'x'.repeat(320), photo: '' }, // Revision 13b: pitch limit 320 (was 40)
       { no: 4, name: 'Direct', handle: '', tagline: '', photo: 'https://example.com/photos/04.jpg' },
     ]);
   });
