@@ -38,7 +38,7 @@ import type {
 export const event: EventInfo = {
   // Revision 13: new id for the Top 10 round, so every phone forgets its
   // Top 20 "I voted" note (the id keys the browser's vote marker, nothing else).
-  id: 'imc4-top10-vote',
+  id: 'imc4-top10-revote',
 
   // The only place the event title is written: the browser tab ("Vote | ...")
   // and the admin brand line follow. 6 Nov 2026 (Kelicia approved): "JKook

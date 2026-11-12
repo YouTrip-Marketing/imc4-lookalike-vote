@@ -1045,3 +1045,5 @@ Stated plainly, so nobody assumes otherwise:
   tuned against traffic.
 - **Accessibility** was built in (labels, focus, live regions, keyboard access to
   the chart, reduced motion) but not audited with a screen reader.
+
+**Revote (12 Nov 2026):** `event.id` changed to `imc4-top10-revote` so every phone forgets its round-1 "I voted" note; round-1 rows were archived to the "Votes Top 10 R1 (6-12 Nov)" tab and the Votes tab cleared, so Code.gs accepts every email again. Contestants, close time and the Tally formulas are unchanged.
